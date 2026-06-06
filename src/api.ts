@@ -181,14 +181,6 @@ export async function approveDevicePairing(token: string, code: string) {
   )
 }
 
-export async function createQrDeviceLogin(token: string, deviceName = 'Meta Display') {
-  return apiRequest<{ pairing: DevicePairing }>('/device-pairings/qr-login', {
-    method: 'POST',
-    token,
-    body: { deviceName },
-  })
-}
-
 export async function getPairedDevices(token: string) {
   return apiRequest<{ devices: PairedDevice[] }>('/device-pairings/devices/list', { token })
 }

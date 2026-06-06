@@ -324,7 +324,7 @@ select {
 
 .capture-box,
 .result-box,
-.scanner-box {
+.pair-code-card {
   display: grid;
   gap: 10px;
   padding: 18px;
@@ -334,7 +334,8 @@ select {
 }
 
 .capture-box strong,
-.result-box strong {
+.result-box strong,
+.pair-code-card strong {
   color: #f8fbff;
   font-size: clamp(34px, 11vw, 58px);
   line-height: 1;
@@ -344,9 +345,20 @@ select {
 .capture-box span,
 .result-box span,
 .result-box small,
+.pair-code-card span,
 .status-message {
   color: rgba(255, 255, 255, 0.72);
   overflow-wrap: anywhere;
+}
+
+.pair-code-card {
+  text-align: center;
+}
+
+.pair-code-card strong {
+  font-family: var(--mono);
+  font-size: clamp(52px, 16vw, 86px);
+  letter-spacing: 0.08em;
 }
 
 .qr-code {
@@ -356,13 +368,6 @@ select {
   padding: 10px;
   border-radius: 20px;
   background: #fff;
-}
-
-.scanner-box video {
-  width: 100%;
-  max-height: 260px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.08);
 }
 
 @media (max-width: 480px) {
