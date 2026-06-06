@@ -254,6 +254,11 @@ select {
   gap: 10px;
 }
 
+.paired-devices {
+  display: grid;
+  gap: 10px;
+}
+
 .key-row {
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);

@@ -40,6 +40,24 @@ export type ImageLookup = {
   updatedAt: string
 }
 
+export type DevicePairing = {
+  id: string
+  code: string
+  deviceName: string
+  status: 'pending' | 'approved' | 'expired'
+  expiresAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type PairedDevice = {
+  id: string
+  name: string
+  deviceType: string
+  lastSeenAt: string | null
+  createdAt: string
+}
+
 type RequestOptions = {
   method?: string
   body?: unknown
@@ -136,6 +154,40 @@ export async function createImageLookup(token: string) {
 
 export async function getImageLookup(token: string, lookupId: string) {
   return apiRequest<{ lookup: ImageLookup }>(`/lookups/${encodeURIComponent(lookupId)}`, {
+    token,
+  })
+}
+
+export async function createDevicePairing(deviceName = 'Meta Display') {
+  return apiRequest<{ pairing: DevicePairing }>('/device-pairings', {
+    method: 'POST',
+    body: { deviceName },
+  })
+}
+
+export async function getDevicePairing(pairingId: string) {
+  return apiRequest<{ pairing: DevicePairing; user?: User; session?: Session }>(
+    `/device-pairings/sessions/${encodeURIComponent(pairingId)}`,
+  )
+}
+
+export async function approveDevicePairing(token: string, code: string) {
+  return apiRequest<{ pairing: DevicePairing }>(
+    `/device-pairings/${encodeURIComponent(code)}/approve`,
+    {
+      method: 'POST',
+      token,
+    },
+  )
+}
+
+export async function getPairedDevices(token: string) {
+  return apiRequest<{ devices: PairedDevice[] }>('/device-pairings/devices/list', { token })
+}
+
+export async function removePairedDevice(token: string, deviceId: string) {
+  return apiRequest<void>(`/device-pairings/devices/${encodeURIComponent(deviceId)}`, {
+    method: 'DELETE',
     token,
   })
 }
