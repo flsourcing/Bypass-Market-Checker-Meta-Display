@@ -43,6 +43,7 @@
 .primary-button,
 .text-button,
 .mini-button,
+.icon-button,
 .settings-button {
   font: inherit;
   cursor: pointer;
@@ -77,6 +78,8 @@
 .text-button:hover,
 .mini-button:focus-visible,
 .mini-button:hover,
+.icon-button:focus-visible,
+.icon-button:hover,
 .settings-button:focus-visible,
 .settings-button:hover,
 input:focus,
@@ -94,7 +97,8 @@ select:focus {
 
 .lookup-button:disabled,
 .primary-button:disabled,
-.mini-button:disabled {
+.mini-button:disabled,
+.icon-button:disabled {
   cursor: wait;
   opacity: 0.62;
 }
@@ -170,6 +174,13 @@ select {
   border-radius: 22px;
 }
 
+.ready-button {
+  border-color: rgba(82, 255, 151, 0.7);
+  background:
+    linear-gradient(180deg, rgba(82, 255, 151, 0.42), rgba(82, 255, 151, 0.18)),
+    rgba(18, 88, 52, 0.78);
+}
+
 .text-button,
 .mini-button {
   min-height: 46px;
@@ -188,17 +199,28 @@ select {
 }
 
 .status-message,
-.bottom-hint {
+.center-message {
   color: rgba(255, 255, 255, 0.78);
   font-weight: 700;
 }
 
-.bottom-hint {
+.center-message {
   position: absolute;
   left: 28px;
   right: 28px;
-  bottom: 142px;
+  top: 50%;
+  transform: translateY(-50%);
   text-align: center;
+  pointer-events: none;
+}
+
+.center-message.in-card {
+  position: static;
+  transform: none;
+  padding: 12px;
+  border: 1px solid rgba(98, 210, 255, 0.2);
+  border-radius: 18px;
+  background: rgba(98, 210, 255, 0.08);
 }
 
 .user-chip {
@@ -241,6 +263,54 @@ select {
   text-transform: capitalize;
 }
 
+.key-info {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.key-info code {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.key-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-button {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.icon-button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trash-button {
+  color: #ff8f8f;
+  border-color: rgba(255, 120, 120, 0.42);
+  background: rgba(120, 24, 24, 0.26);
+}
+
 .add-label {
   color: var(--accent);
   font-size: 18px;
@@ -267,9 +337,19 @@ select {
 
 .capture-box span,
 .result-box span,
-.result-box small {
+.result-box small,
+.status-message {
   color: rgba(255, 255, 255, 0.72);
   overflow-wrap: anywhere;
+}
+
+.qr-code {
+  width: 162px;
+  height: 162px;
+  justify-self: center;
+  padding: 10px;
+  border-radius: 20px;
+  background: #fff;
 }
 
 @media (max-width: 480px) {

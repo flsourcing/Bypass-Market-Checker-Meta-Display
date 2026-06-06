@@ -37,6 +37,9 @@ jobs:
           GITHUB_PAGES: 'true'
           VITE_META_CLOUD_API_URL: 'https://meta-cloud-meta-cloud.up.railway.app'
 
+      - name: Add SPA fallback
+        run: cp dist/index.html dist/404.html
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

@@ -11,6 +11,7 @@ import {
   getStoredToken,
   login,
   register,
+  revealApiKey,
   saveApiKey,
   setStoredToken,
 } from './api'
@@ -31,6 +32,7 @@ function App() {
   const [apiKey, setApiKey] = useState('')
   const [lookup, setLookup] = useState<ImageLookup | null>(null)
   const [message, setMessage] = useState('')
+  const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
 
   useEffect(() => {
@@ -162,9 +164,44 @@ function App() {
     try {
       await deleteApiKey(token, providerName)
       await refreshApiKeys(token)
+      setRevealedKeys((current) => {
+        const next = { ...current }
+        delete next[providerName]
+        return next
+      })
       setMessage('API key removed.')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not remove API key')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleToggleApiKey(providerName: string) {
+    if (!token) {
+      return
+    }
+
+    if (revealedKeys[providerName]) {
+      setRevealedKeys((current) => {
+        const next = { ...current }
+        delete next[providerName]
+        return next
+      })
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      const result = await revealApiKey(token, providerName)
+      setRevealedKeys((current) => ({
+        ...current,
+        [providerName]: result.apiKey,
+      }))
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not show API key')
     } finally {
       setIsBusy(false)
     }
@@ -202,11 +239,17 @@ function App() {
   }
 
   const hasGeminiKey = apiKeys.some((record) => record.provider === 'gemini')
+  const needsKeyMessage = !hasGeminiKey
+    ? 'Add a Gemini API key in Settings before image lookup.'
+    : ''
   const lookupStatus = lookup?.status === 'complete'
     ? 'Lookup Complete'
     : lookup?.status === 'error'
       ? 'Lookup Failed'
       : message || 'Looking Up Product'
+  const qrCodeUrl = lookup
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(lookup.captureUrl)}`
+    : ''
 
   return (
     <main className="app-shell">
@@ -286,10 +329,9 @@ function App() {
               Barcode Lookup
             </button>
           </section>
-          {!hasGeminiKey && (
-            <p className="bottom-hint">Add a Gemini API key in Settings before image lookup.</p>
+          {(needsKeyMessage || message) && (
+            <p className="center-message">{message || needsKeyMessage}</p>
           )}
-          {message && <p className="bottom-hint">{message}</p>}
         </section>
       )}
 
@@ -309,16 +351,43 @@ function App() {
             {apiKeys.length === 0 && <p>No API keys saved.</p>}
             {apiKeys.map((record) => (
               <div className="key-row" key={record.id}>
-                <span>{record.provider}</span>
-                <button
-                  className="mini-button"
-                  type="button"
-                  data-focusable
-                  disabled={isBusy}
-                  onClick={() => handleDeleteApiKey(record.provider)}
-                >
-                  Delete
-                </button>
+                <div className="key-info">
+                  <span>{record.provider}</span>
+                  {revealedKeys[record.provider] && (
+                    <code>{revealedKeys[record.provider]}</code>
+                  )}
+                </div>
+                <div className="key-actions">
+                  <button
+                    className="icon-button"
+                    type="button"
+                    data-focusable
+                    disabled={isBusy}
+                    aria-label={revealedKeys[record.provider] ? `Hide ${record.provider} API key` : `Show ${record.provider} API key`}
+                    onClick={() => handleToggleApiKey(record.provider)}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                  <button
+                    className="icon-button trash-button"
+                    type="button"
+                    data-focusable
+                    disabled={isBusy}
+                    aria-label={`Delete ${record.provider} API key`}
+                    onClick={() => handleDeleteApiKey(record.provider)}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M4 7h16" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                      <path d="M6 7l1 14h10l1-14" />
+                      <path d="M9 7V4h6v3" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -335,7 +404,12 @@ function App() {
               value={apiKey}
               onChange={(event) => setApiKey(event.target.value)}
             />
-            <button className="primary-button" type="submit" data-focusable disabled={isBusy}>
+            <button
+              className={`primary-button ${apiKey.trim() ? 'ready-button' : ''}`}
+              type="submit"
+              data-focusable
+              disabled={isBusy || !apiKey.trim()}
+            >
               Save API Key
             </button>
           </form>
@@ -343,7 +417,7 @@ function App() {
           <button className="text-button danger" type="button" data-focusable onClick={handleLogout}>
             Log Out
           </button>
-          {message && <p className="status-message">{message}</p>}
+          {message && <p className="center-message in-card">{message}</p>}
         </section>
       )}
 
@@ -354,7 +428,8 @@ function App() {
 
           {lookup && lookup.status !== 'complete' && lookup.status !== 'error' && (
             <div className="capture-box">
-              <p>Open this on your phone to snap the shoe photo:</p>
+              <p>Scan this QR code on your phone to take or upload the shoe photo:</p>
+              <img className="qr-code" src={qrCodeUrl} alt={`QR code for ${lookup.captureUrl}`} />
               <strong>{lookup.captureCode}</strong>
               <span>{lookup.captureUrl}</span>
             </div>

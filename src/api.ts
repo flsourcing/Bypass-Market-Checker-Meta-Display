@@ -112,6 +112,13 @@ export async function saveApiKey(token: string, provider: string, apiKey: string
   })
 }
 
+export async function revealApiKey(token: string, provider: string) {
+  return apiRequest<{ provider: string; apiKey: string }>(
+    `/api-keys/${encodeURIComponent(provider)}/reveal`,
+    { token },
+  )
+}
+
 export async function deleteApiKey(token: string, provider: string) {
   return apiRequest<void>(`/api-keys/${encodeURIComponent(provider)}`, {
     method: 'DELETE',
