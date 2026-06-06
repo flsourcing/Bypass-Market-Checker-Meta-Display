@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
 import {
@@ -6,6 +6,7 @@ import {
   clearStoredToken,
   createDevicePairing,
   createImageLookup,
+  createQrDeviceLogin,
   deleteApiKey,
   getApiKeys,
   getDevicePairing,
@@ -28,7 +29,14 @@ type AuthMode = 'login' | 'register'
 function App() {
   const isDisplayApp = window.location.pathname.toLowerCase().includes('/display-app')
   const initialPairCode = new URLSearchParams(window.location.search).get('pair')?.toUpperCase() ?? ''
-  const browserAppUrl = `${window.location.origin}${window.location.pathname.replace(/\/Display-App\/?$/i, '/')}`
+  const claimPairingId = new URLSearchParams(window.location.search).get('claim') ?? ''
+  const basePath = isDisplayApp
+    ? window.location.pathname.replace(/\/Display-App\/?$/i, '/')
+    : window.location.pathname.endsWith('/')
+      ? window.location.pathname
+      : `${window.location.pathname}/`
+  const browserAppUrl = `${window.location.origin}${basePath}`
+  const displayAppUrl = `${window.location.origin}${basePath.replace(/\/$/, '')}/Display-App`
   const [screen, setScreen] = useState<Screen>('auth')
   const [authMode, setAuthMode] = useState<AuthMode>('login')
   const [token, setToken] = useState<string | null>(() => getStoredToken())
@@ -41,10 +49,14 @@ function App() {
   const [apiKey, setApiKey] = useState('')
   const [lookup, setLookup] = useState<ImageLookup | null>(null)
   const [devicePairing, setDevicePairing] = useState<DevicePairing | null>(null)
+  const [qrLoginPairing, setQrLoginPairing] = useState<DevicePairing | null>(null)
   const [approvedPairCode, setApprovedPairCode] = useState('')
   const [message, setMessage] = useState('')
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
+  const [isScanningQr, setIsScanningQr] = useState(false)
+  const [scannerStream, setScannerStream] = useState<MediaStream | null>(null)
+  const scannerVideoRef = useRef<HTMLVideoElement | null>(null)
 
   useEffect(() => {
     const firstFocusable = document.querySelector<HTMLElement>('[data-focusable]')
@@ -98,7 +110,7 @@ function App() {
   }, [token])
 
   useEffect(() => {
-    if (!isDisplayApp || token || devicePairing) {
+    if (!isDisplayApp || token || devicePairing || claimPairingId) {
       return
     }
 
@@ -107,7 +119,32 @@ function App() {
       .catch((error: unknown) => {
         setMessage(error instanceof Error ? error.message : 'Could not create pairing code')
       })
-  }, [devicePairing, isDisplayApp, token])
+  }, [claimPairingId, devicePairing, isDisplayApp, token])
+
+  useEffect(() => {
+    if (!isDisplayApp || !claimPairingId || token) {
+      return
+    }
+
+    getDevicePairing(claimPairingId)
+      .then((result) => {
+        setDevicePairing(result.pairing)
+
+        if (result.session && result.user) {
+          setStoredToken(result.session.token)
+          setToken(result.session.token)
+          setUser(result.user)
+          setScreen('home')
+          setMessage('Meta Display paired.')
+          return
+        }
+
+        setMessage('QR login is not ready or expired.')
+      })
+      .catch((error: unknown) => {
+        setMessage(error instanceof Error ? error.message : 'Could not claim QR login')
+      })
+  }, [claimPairingId, isDisplayApp, token])
 
   useEffect(() => {
     if (!isDisplayApp || !devicePairing || devicePairing.status !== 'pending') {
@@ -151,6 +188,58 @@ function App() {
         setMessage(error instanceof Error ? error.message : 'Could not pair device')
       })
   }, [approvedPairCode, initialPairCode, isDisplayApp, token])
+
+  useEffect(() => {
+    const video = scannerVideoRef.current
+
+    if (!video || !scannerStream) {
+      return
+    }
+
+    video.srcObject = scannerStream
+    void video.play()
+
+    return () => {
+      video.srcObject = null
+    }
+  }, [scannerStream])
+
+  useEffect(() => {
+    if (!isScanningQr || !scannerVideoRef.current) {
+      return
+    }
+
+    const BarcodeDetectorCtor = (window as typeof window & {
+      BarcodeDetector: new (options: { formats: string[] }) => {
+        detect: (source: CanvasImageSource) => Promise<Array<{ rawValue: string }>>
+      }
+    }).BarcodeDetector
+    const detector = new BarcodeDetectorCtor({ formats: ['qr_code'] })
+    const interval = window.setInterval(() => {
+      const video = scannerVideoRef.current
+
+      if (!video || video.readyState < 2) {
+        return
+      }
+
+      detector.detect(video)
+        .then((codes) => {
+          const rawValue = codes[0]?.rawValue
+
+          if (!rawValue) {
+            return
+          }
+
+          scannerStream?.getTracks().forEach((track) => track.stop())
+          setScannerStream(null)
+          setIsScanningQr(false)
+          window.location.href = rawValue
+        })
+        .catch(() => undefined)
+    }, 700)
+
+    return () => window.clearInterval(interval)
+  }, [isScanningQr, scannerStream])
 
   useEffect(() => {
     if (!token || !lookup || (lookup.status !== 'pending' && lookup.status !== 'processing')) {
@@ -336,6 +425,56 @@ function App() {
     }
   }
 
+  async function handleCreateQrLogin() {
+    if (!token) {
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      const { pairing } = await createQrDeviceLogin(token, 'Meta Display')
+      setQrLoginPairing(pairing)
+      await refreshPairedDevices(token)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not create QR login')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleStartQrScanner() {
+    setMessage('')
+
+    if (!('BarcodeDetector' in window)) {
+      setMessage('QR scanning is not supported in this browser.')
+      return
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMessage('Camera scanning is not available in this Meta Web App browser.')
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
+      })
+      setScannerStream(stream)
+      setIsScanningQr(true)
+    } catch {
+      setMessage('Camera access was blocked or is unavailable.')
+    }
+  }
+
+  function stopQrScanner() {
+    scannerStream?.getTracks().forEach((track) => track.stop())
+    setScannerStream(null)
+    setIsScanningQr(false)
+  }
+
   const hasGeminiKey = apiKeys.some((record) => record.provider === 'gemini')
   const needsKeyMessage = !hasGeminiKey
     ? 'Add a Gemini API key in Settings before image lookup.'
@@ -353,6 +492,12 @@ function App() {
     : ''
   const pairingQrCodeUrl = pairingUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(pairingUrl)}`
+    : ''
+  const qrLoginUrl = qrLoginPairing
+    ? `${displayAppUrl}?claim=${encodeURIComponent(qrLoginPairing.id)}`
+    : ''
+  const qrLoginImageUrl = qrLoginUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(qrLoginUrl)}`
     : ''
 
   return (
@@ -377,15 +522,33 @@ function App() {
           <p className="eyebrow">Bypass Market Checker</p>
           {isDisplayApp ? (
             <>
-              <h1>Pair Meta Display</h1>
-              <div className="capture-box">
-                <p>Scan this QR code with your phone, then log in to approve this display.</p>
-                {pairingQrCodeUrl && (
-                  <img className="qr-code" src={pairingQrCodeUrl} alt={`QR code for ${pairingUrl}`} />
-                )}
-                <strong>{devicePairing?.code ?? 'Loading'}</strong>
-                {pairingUrl && <span>{pairingUrl}</span>}
-              </div>
+              <h1>Login Via QR Code Scan</h1>
+              <p className="status-message">
+                On your computer or phone, open Settings, then Paired Devices, then QR Code.
+                Scan that QR code here to log this display in.
+              </p>
+              {isScanningQr ? (
+                <div className="scanner-box">
+                  <video ref={scannerVideoRef} muted playsInline />
+                  <button className="text-button" type="button" data-focusable onClick={stopQrScanner}>
+                    Stop Scanner
+                  </button>
+                </div>
+              ) : (
+                <button className="primary-button ready-button" type="button" data-focusable onClick={handleStartQrScanner}>
+                  Start QR Scanner
+                </button>
+              )}
+              {devicePairing && (
+                <div className="capture-box">
+                  <p>Fallback: scan/open this URL from your phone if camera scanning is blocked.</p>
+                  {pairingQrCodeUrl && (
+                    <img className="qr-code" src={pairingQrCodeUrl} alt={`QR code for ${pairingUrl}`} />
+                  )}
+                  <strong>{devicePairing.code}</strong>
+                  {pairingUrl && <span>{pairingUrl}</span>}
+                </div>
+              )}
               <button
                 className="text-button"
                 type="button"
@@ -550,6 +713,25 @@ function App() {
 
           <div className="paired-devices">
             <div className="add-label">Paired Devices</div>
+            {!isDisplayApp && (
+              <button
+                className={`primary-button ${qrLoginPairing ? 'ready-button' : ''}`}
+                type="button"
+                data-focusable
+                disabled={isBusy}
+                onClick={handleCreateQrLogin}
+              >
+                QR Code
+              </button>
+            )}
+            {qrLoginPairing && (
+              <div className="capture-box">
+                <p>Open `/Display-App` on the glasses and scan this QR code to log in.</p>
+                <img className="qr-code" src={qrLoginImageUrl} alt={`QR code for ${qrLoginUrl}`} />
+                <strong>{qrLoginPairing.code}</strong>
+                <span>{qrLoginUrl}</span>
+              </div>
+            )}
             {pairedDevices.length === 0 && <p>No paired devices yet.</p>}
             {pairedDevices.map((device) => (
               <div className="key-row" key={device.id}>
