@@ -61,6 +61,10 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Registration: \(wearables.registrationState)", systemImage: "checkmark.seal")
                 Label("Devices found: \(wearables.deviceCount)", systemImage: "eyeglasses")
+                Label(
+                    "Camera stream: \(wearables.isCameraStreamReady ? "ready" : "not ready")",
+                    systemImage: wearables.isCameraStreamReady ? "camera.fill" : "camera"
+                )
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -91,6 +95,7 @@ struct ContentView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .disabled(!wearables.isCameraStreamReady)
 
             HStack(spacing: 12) {
                 scanOption(title: "Image Search", subtitle: "Find SKU", icon: "sparkle.magnifyingglass")

@@ -18,6 +18,7 @@ final class WearablesService: ObservableObject {
     @Published private(set) var deviceCount = 0
     @Published private(set) var lastPhoto: UIImage?
     @Published private(set) var bestMatch: ProductMatch?
+    @Published private(set) var isCameraStreamReady = false
 
     private var isConfigured = false
     private var session: DeviceSession?
@@ -43,6 +44,9 @@ final class WearablesService: ObservableObject {
                 status = "Opening Meta AI registration..."
                 try await wearables.startRegistration()
                 status = "Finish registration in the Meta AI app, then return here."
+            } catch RegistrationError.alreadyRegistered {
+                registrationState = "registered"
+                status = "Already registered with Meta AI. Tap Connect Glasses."
             } catch {
                 status = "Registration failed: \(error.localizedDescription)"
             }
@@ -56,11 +60,21 @@ final class WearablesService: ObservableObject {
 
         Task {
             do {
-                status = "Requesting camera permission..."
-                let permission = try await wearables.requestPermission(.camera)
+                status = "Checking camera permission..."
+                var permission = try await wearables.checkPermissionStatus(.camera)
+
+                if permission != .granted {
+                    status = "Meta AI will ask for camera access. Choose Always Allow, then return here."
+                    permission = try await wearables.requestPermission(.camera)
+                }
 
                 guard permission == .granted else {
-                    status = "Camera permission was not granted in Meta AI."
+                    status = "Camera permission was not granted. Tap Connect Glasses after allowing it in Meta AI."
+                    return
+                }
+
+                if stream != nil {
+                    status = "Camera stream is already ready. Tap Scan Product."
                     return
                 }
 
@@ -95,11 +109,15 @@ final class WearablesService: ObservableObject {
                 self.stream = stream
                 attachStreamListeners(stream)
                 await stream.start()
+                isCameraStreamReady = true
 
                 if let display = try? session.addDisplay() {
                     self.display = display
                     await display.start()
                     await sendReadyDisplay()
+                } else {
+                    status = "Camera connected. Display view is not available on this device/session."
+                    return
                 }
 
                 status = "Connected. Point the glasses at a product and tap Scan Product."
@@ -111,7 +129,7 @@ final class WearablesService: ObservableObject {
 
     func captureProductPhoto() {
         guard let stream else {
-            status = "Connect glasses before scanning."
+            status = "Connect Glasses first, then wait for the camera stream to be ready."
             return
         }
 
@@ -181,6 +199,10 @@ final class WearablesService: ObservableObject {
     }
 
     private func waitForStartedSession(_ session: DeviceSession) async throws {
+        if session.state == .started {
+            return
+        }
+
         for await state in session.stateStream() {
             if state == .started {
                 return
@@ -195,6 +217,7 @@ final class WearablesService: ObservableObject {
     private func attachStreamListeners(_ stream: MWDATCamera.Stream) {
         let stateToken = stream.statePublisher.listen { state in
             Task { @MainActor in
+                self.isCameraStreamReady = state == .streaming
                 self.status = "Camera stream: \(String(describing: state))"
             }
         }
