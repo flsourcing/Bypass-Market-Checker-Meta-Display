@@ -88,6 +88,7 @@ struct ContentView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
+            .disabled(wearables.isConnecting)
 
             Button {
                 wearables.captureProductPhoto()

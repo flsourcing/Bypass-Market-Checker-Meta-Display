@@ -20,6 +20,7 @@ final class WearablesService: ObservableObject {
     @Published private(set) var bestMatch: ProductMatch?
     @Published private(set) var isCameraStreamReady = false
     @Published private(set) var deviceSummary = "No DAT device details yet."
+    @Published private(set) var isConnecting = false
 
     private var isConfigured = false
     private var deviceIdentifiers: [DeviceIdentifier] = []
@@ -60,7 +61,15 @@ final class WearablesService: ObservableObject {
             return
         }
 
+        guard !isConnecting else {
+            status = "Connection already in progress."
+            return
+        }
+
         Task {
+            isConnecting = true
+            defer { isConnecting = false }
+
             do {
                 status = "Checking camera permission..."
                 var permission = try await wearables.checkPermissionStatus(.camera)
@@ -82,6 +91,7 @@ final class WearablesService: ObservableObject {
 
                 status = "Starting glasses session..."
                 refreshDeviceSummary(using: wearables)
+                await resetConnection(keepStatus: true)
 
                 guard let deviceIdentifier = preferredDeviceIdentifier(using: wearables) else {
                     status = "No eligible DAT device yet. Keep glasses connected in Meta AI, then tap Connect Glasses again."
@@ -130,7 +140,14 @@ final class WearablesService: ObservableObject {
                 }
 
                 status = "Connected. Point the glasses at a product and tap Scan Product."
+            } catch DeviceSessionError.noEligibleDevice {
+                await resetConnection(keepStatus: true)
+                status = "No eligible device. Keep glasses awake, connected in Meta AI, and off low-battery mode, then tap Connect again."
+            } catch DeviceSessionError.sessionAlreadyExists {
+                await resetConnection(keepStatus: true)
+                status = "Cleared a stale glasses session. Tap Connect Glasses again."
             } catch {
+                await resetConnection(keepStatus: true)
                 status = "Connection failed: \(error.localizedDescription)"
             }
         }
@@ -215,6 +232,25 @@ final class WearablesService: ObservableObject {
         }
 
         return connectedDevice ?? deviceIdentifiers.first
+    }
+
+    private func resetConnection(keepStatus: Bool = false) async {
+        for token in listenerTokens {
+            await token.cancel()
+        }
+
+        listenerTokens.removeAll()
+        await stream?.stop()
+        await display?.stop()
+        session?.stop()
+        stream = nil
+        display = nil
+        session = nil
+        isCameraStreamReady = false
+
+        if !keepStatus {
+            status = "Connection reset."
+        }
     }
 
     private func refreshDeviceSummary(using wearables: any WearablesInterface) {
