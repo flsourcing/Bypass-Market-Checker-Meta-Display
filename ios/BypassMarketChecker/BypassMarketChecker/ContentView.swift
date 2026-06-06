@@ -90,6 +90,24 @@ struct ContentView: View {
             .controlSize(.large)
             .disabled(wearables.isConnecting)
 
+            HStack(spacing: 12) {
+                Button {
+                    wearables.openDATGlassesAppUpdate()
+                } label: {
+                    Label("DAT App", systemImage: "arrow.down.circle")
+                        .frame(maxWidth: .infinity)
+                }
+
+                Button {
+                    wearables.openFirmwareUpdate()
+                } label: {
+                    Label("Firmware", systemImage: "gear.badge")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
             Button {
                 wearables.captureProductPhoto()
             } label: {

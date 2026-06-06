@@ -153,6 +153,36 @@ final class WearablesService: ObservableObject {
         }
     }
 
+    func openDATGlassesAppUpdate() {
+        guard let wearables = configuredWearables() else {
+            return
+        }
+
+        Task {
+            do {
+                status = "Opening Meta DAT glasses app update..."
+                try await wearables.openDATGlassesAppUpdate()
+            } catch {
+                status = "Could not open DAT glasses app update: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    func openFirmwareUpdate() {
+        guard let wearables = configuredWearables() else {
+            return
+        }
+
+        Task {
+            do {
+                status = "Opening glasses firmware update..."
+                try await wearables.openFirmwareUpdate()
+            } catch {
+                status = "Could not open firmware update: \(error.localizedDescription)"
+            }
+        }
+    }
+
     func captureProductPhoto() {
         guard let stream else {
             status = "Connect Glasses first, then wait for the camera stream to be ready."
