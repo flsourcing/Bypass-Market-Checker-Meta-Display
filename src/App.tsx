@@ -1,29 +1,60 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import './App.css'
+import {
+  clearStoredToken,
+  createImageLookup,
+  deleteApiKey,
+  getApiKeys,
+  getImageLookup,
+  getMe,
+  getStoredToken,
+  login,
+  register,
+  saveApiKey,
+  setStoredToken,
+} from './api'
+import type { ApiKeyRecord, ImageLookup, User } from './api'
+
+type Screen = 'auth' | 'home' | 'settings' | 'lookup'
+type AuthMode = 'login' | 'register'
 
 function App() {
-  const focusableRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const [screen, setScreen] = useState<Screen>('auth')
+  const [authMode, setAuthMode] = useState<AuthMode>('login')
+  const [token, setToken] = useState<string | null>(() => getStoredToken())
+  const [user, setUser] = useState<User | null>(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>([])
+  const [provider, setProvider] = useState('gemini')
+  const [apiKey, setApiKey] = useState('')
+  const [lookup, setLookup] = useState<ImageLookup | null>(null)
+  const [message, setMessage] = useState('')
+  const [isBusy, setIsBusy] = useState(false)
 
   useEffect(() => {
-    focusableRefs.current[0]?.focus()
-  }, [])
+    const firstFocusable = document.querySelector<HTMLElement>('[data-focusable]')
+    firstFocusable?.focus()
+  }, [screen, authMode, lookup?.status])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      const currentIndex = focusableRefs.current.findIndex(
-        (element) => element === document.activeElement,
+      const focusableElements = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-focusable]'),
       )
+      const currentIndex = focusableElements.findIndex((element) => element === document.activeElement)
 
       if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
         event.preventDefault()
-        const nextIndex = currentIndex <= 0 ? 1 : 0
-        focusableRefs.current[nextIndex]?.focus()
+        const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % focusableElements.length
+        focusableElements[nextIndex]?.focus()
       }
 
       if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
         event.preventDefault()
-        const nextIndex = currentIndex <= 0 ? 1 : 0
-        focusableRefs.current[nextIndex]?.focus()
+        const nextIndex = currentIndex <= 0 ? focusableElements.length - 1 : currentIndex - 1
+        focusableElements[nextIndex]?.focus()
       }
     }
 
@@ -32,29 +63,330 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  useEffect(() => {
+    if (!token) {
+      return
+    }
+
+    getMe(token)
+      .then(({ user: currentUser }) => {
+        setUser(currentUser)
+        setScreen('home')
+        return getApiKeys(token)
+      })
+      .then(({ apiKeys: records }) => setApiKeys(records))
+      .catch(() => {
+        clearStoredToken()
+        setToken(null)
+        setUser(null)
+      })
+  }, [token])
+
+  useEffect(() => {
+    if (!token || !lookup || (lookup.status !== 'pending' && lookup.status !== 'processing')) {
+      return
+    }
+
+    const interval = window.setInterval(() => {
+      getImageLookup(token, lookup.id)
+        .then(({ lookup: latestLookup }) => setLookup(latestLookup))
+        .catch((error: unknown) => {
+          setMessage(error instanceof Error ? error.message : 'Unable to check lookup status')
+        })
+    }, 3000)
+
+    return () => window.clearInterval(interval)
+  }, [lookup, token])
+
+  async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      const result = authMode === 'login'
+        ? await login(email, password)
+        : await register(email, password)
+
+      setStoredToken(result.session.token)
+      setToken(result.session.token)
+      setUser(result.user)
+      setPassword('')
+      setScreen('home')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Authentication failed')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function refreshApiKeys(activeToken = token) {
+    if (!activeToken) {
+      return
+    }
+
+    const { apiKeys: records } = await getApiKeys(activeToken)
+    setApiKeys(records)
+  }
+
+  async function handleSaveApiKey(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!token) {
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await saveApiKey(token, provider, apiKey)
+      setApiKey('')
+      await refreshApiKeys(token)
+      setMessage('API key saved.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not save API key')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleDeleteApiKey(providerName: string) {
+    if (!token) {
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await deleteApiKey(token, providerName)
+      await refreshApiKeys(token)
+      setMessage('API key removed.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not remove API key')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleImageLookup() {
+    if (!token) {
+      setScreen('auth')
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('Looking Up Product')
+    setLookup(null)
+    setScreen('lookup')
+
+    try {
+      const { lookup: createdLookup } = await createImageLookup(token)
+      setLookup(createdLookup)
+      setMessage('Looking Up Product')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not start image lookup')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  function handleLogout() {
+    clearStoredToken()
+    setToken(null)
+    setUser(null)
+    setApiKeys([])
+    setLookup(null)
+    setScreen('auth')
+  }
+
+  const hasGeminiKey = apiKeys.some((record) => record.provider === 'gemini')
+  const lookupStatus = lookup?.status === 'complete'
+    ? 'Lookup Complete'
+    : lookup?.status === 'error'
+      ? 'Lookup Failed'
+      : message || 'Looking Up Product'
+
   return (
     <main className="app-shell">
-      <section className="lookup-panel" aria-label="Bypass Market Checker">
+      {screen !== 'auth' && (
         <button
-          ref={(element) => {
-            focusableRefs.current[0] = element
-          }}
-          className="lookup-button"
+          className="settings-button"
           type="button"
+          aria-label="Settings"
+          data-focusable
+          onClick={() => {
+            setMessage('')
+            setScreen('settings')
+          }}
         >
-          Image Lookup
+          ⚙
         </button>
+      )}
 
-        <button
-          ref={(element) => {
-            focusableRefs.current[1] = element
-          }}
-          className="lookup-button"
-          type="button"
-        >
-          Barcode Lookup
-        </button>
-      </section>
+      {screen === 'auth' && (
+        <section className="glass-card auth-card" aria-label="Account">
+          <p className="eyebrow">Bypass Market Checker</p>
+          <h1>{authMode === 'login' ? 'Log In' : 'Create Account'}</h1>
+          <form className="stack-form" onSubmit={handleAuthSubmit}>
+            <input
+              data-focusable
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+            <input
+              data-focusable
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <button className="primary-button" type="submit" data-focusable disabled={isBusy}>
+              {authMode === 'login' ? 'Log In' : 'Create Account'}
+            </button>
+          </form>
+          <button
+            className="text-button"
+            type="button"
+            data-focusable
+            onClick={() => {
+              setMessage('')
+              setAuthMode(authMode === 'login' ? 'register' : 'login')
+            }}
+          >
+            {authMode === 'login' ? 'Need an account?' : 'Already have an account?'}
+          </button>
+          {message && <p className="status-message">{message}</p>}
+        </section>
+      )}
+
+      {screen === 'home' && (
+        <section className="home-wrap" aria-label="Bypass Market Checker">
+          <div className="user-chip">{user?.email}</div>
+          <section className="lookup-panel">
+            <button
+              className="lookup-button"
+              type="button"
+              data-focusable
+              onClick={handleImageLookup}
+              disabled={isBusy}
+            >
+              Image Lookup
+            </button>
+
+            <button
+              className="lookup-button"
+              type="button"
+              data-focusable
+              onClick={() => setMessage('Barcode Lookup is next.')}
+            >
+              Barcode Lookup
+            </button>
+          </section>
+          {!hasGeminiKey && (
+            <p className="bottom-hint">Add a Gemini API key in Settings before image lookup.</p>
+          )}
+          {message && <p className="bottom-hint">{message}</p>}
+        </section>
+      )}
+
+      {screen === 'settings' && (
+        <section className="glass-card settings-card" aria-label="Settings">
+          <div className="card-header">
+            <div>
+              <p className="eyebrow">Settings</p>
+              <h1>API Keys</h1>
+            </div>
+            <button className="text-button" type="button" data-focusable onClick={() => setScreen('home')}>
+              Done
+            </button>
+          </div>
+
+          <div className="key-list">
+            {apiKeys.length === 0 && <p>No API keys saved.</p>}
+            {apiKeys.map((record) => (
+              <div className="key-row" key={record.id}>
+                <span>{record.provider}</span>
+                <button
+                  className="mini-button"
+                  type="button"
+                  data-focusable
+                  disabled={isBusy}
+                  onClick={() => handleDeleteApiKey(record.provider)}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <form className="stack-form" onSubmit={handleSaveApiKey}>
+            <div className="add-label">+ Add API Key</div>
+            <select data-focusable value={provider} onChange={(event) => setProvider(event.target.value)}>
+              <option value="gemini">Gemini Vision</option>
+            </select>
+            <input
+              data-focusable
+              type="password"
+              placeholder="Paste API key"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+            />
+            <button className="primary-button" type="submit" data-focusable disabled={isBusy}>
+              Save API Key
+            </button>
+          </form>
+
+          <button className="text-button danger" type="button" data-focusable onClick={handleLogout}>
+            Log Out
+          </button>
+          {message && <p className="status-message">{message}</p>}
+        </section>
+      )}
+
+      {screen === 'lookup' && (
+        <section className="glass-card lookup-card" aria-label="Image Lookup">
+          <p className="eyebrow">Image Lookup</p>
+          <h1>{lookupStatus}</h1>
+
+          {lookup && lookup.status !== 'complete' && lookup.status !== 'error' && (
+            <div className="capture-box">
+              <p>Open this on your phone to snap the shoe photo:</p>
+              <strong>{lookup.captureCode}</strong>
+              <span>{lookup.captureUrl}</span>
+            </div>
+          )}
+
+          {lookup?.status === 'complete' && (
+            <div className="result-box">
+              <p>SKU</p>
+              <strong>{lookup.result?.sku ?? 'Not found'}</strong>
+              <span>
+                {[lookup.result?.brand, lookup.result?.model, lookup.result?.colorway]
+                  .filter(Boolean)
+                  .join(' • ') || 'No product details returned'}
+              </span>
+              <small>Confidence: {lookup.result?.confidence ?? 0}%</small>
+            </div>
+          )}
+
+          {lookup?.status === 'error' && (
+            <p className="status-message">{lookup.error ?? 'Lookup failed'}</p>
+          )}
+
+          <div className="actions-row">
+            <button className="primary-button" type="button" data-focusable onClick={() => setScreen('home')}>
+              Home
+            </button>
+            <button className="text-button" type="button" data-focusable onClick={handleImageLookup}>
+              Retry
+            </button>
+          </div>
+        </section>
+      )}
     </main>
   )
 }
