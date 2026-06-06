@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
 import {
@@ -19,6 +19,7 @@ import {
   revealApiKey,
   saveApiKey,
   setStoredToken,
+  uploadLookupImage,
 } from './api'
 import type { ApiKeyRecord, DevicePairing, ImageLookup, PairedDevice, User } from './api'
 
@@ -43,6 +44,9 @@ function App() {
   const [message, setMessage] = useState('')
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
+  const [cameraError, setCameraError] = useState('')
+  const videoRef = useRef<HTMLVideoElement | null>(null)
 
   useEffect(() => {
     const firstFocusable = document.querySelector<HTMLElement>('[data-focusable]')
@@ -162,6 +166,21 @@ function App() {
     return () => window.clearInterval(interval)
   }, [lookup, token])
 
+  useEffect(() => {
+    const video = videoRef.current
+
+    if (!video || !cameraStream) {
+      return
+    }
+
+    video.srcObject = cameraStream
+    void video.play()
+
+    return () => {
+      video.srcObject = null
+    }
+  }, [cameraStream])
+
   async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setIsBusy(true)
@@ -182,6 +201,11 @@ function App() {
     } finally {
       setIsBusy(false)
     }
+  }
+
+  function stopCamera() {
+    cameraStream?.getTracks().forEach((track) => track.stop())
+    setCameraStream(null)
   }
 
   async function refreshApiKeys(activeToken = token) {
@@ -286,6 +310,7 @@ function App() {
 
     setIsBusy(true)
     setMessage('Looking Up Product')
+    setCameraError('')
     setLookup(null)
     setScreen('lookup')
 
@@ -300,7 +325,69 @@ function App() {
     }
   }
 
+  async function handleStartCamera() {
+    setCameraError('')
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Camera unavailable, use phone upload.')
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
+      })
+      setCameraStream(stream)
+    } catch {
+      setCameraError('Camera unavailable, use phone upload.')
+    }
+  }
+
+  async function handleCapturePhoto() {
+    if (!lookup || !videoRef.current) {
+      return
+    }
+
+    setIsBusy(true)
+    setCameraError('')
+    setMessage('Looking Up Product')
+
+    try {
+      const video = videoRef.current
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth || 1280
+      canvas.height = video.videoHeight || 720
+      const context = canvas.getContext('2d')
+
+      if (!context) {
+        throw new Error('Could not capture camera frame')
+      }
+
+      context.drawImage(video, 0, 0, canvas.width, canvas.height)
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((value) => {
+          if (value) {
+            resolve(value)
+            return
+          }
+
+          reject(new Error('Could not create camera image'))
+        }, 'image/jpeg', 0.9)
+      })
+      const { lookup: updatedLookup } = await uploadLookupImage(lookup.captureCode, blob)
+
+      stopCamera()
+      setLookup(updatedLookup)
+    } catch (error) {
+      setCameraError(error instanceof Error ? error.message : 'Camera unavailable, use phone upload.')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
   function handleLogout() {
+    stopCamera()
     clearStoredToken()
     setToken(null)
     setUser(null)
@@ -381,6 +468,7 @@ function App() {
           aria-label="Settings"
           data-focusable
           onClick={() => {
+            stopCamera()
             setMessage('')
             setScreen('settings')
           }}
@@ -622,7 +710,40 @@ function App() {
           <p className="eyebrow">Image Lookup</p>
           <h1>{lookupStatus}</h1>
 
-          {lookup && lookup.status !== 'complete' && lookup.status !== 'error' && (
+          {lookup && isDisplayApp && lookup.status !== 'complete' && lookup.status !== 'error' && (
+            <div className="camera-card">
+              {cameraStream ? (
+                <>
+                  <video ref={videoRef} muted playsInline />
+                  <button
+                    className="primary-button ready-button"
+                    type="button"
+                    data-focusable
+                    disabled={isBusy}
+                    onClick={handleCapturePhoto}
+                  >
+                    Take Photo
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="primary-button ready-button"
+                  type="button"
+                  data-focusable
+                  disabled={isBusy}
+                  onClick={handleStartCamera}
+                >
+                  Take Photo
+                </button>
+              )}
+              {cameraError && <p className="status-message">{cameraError}</p>}
+              <p className="status-message">If camera is blocked, use phone upload:</p>
+              <strong>{lookup.captureCode}</strong>
+              <span>{lookup.captureUrl}</span>
+            </div>
+          )}
+
+          {lookup && !isDisplayApp && lookup.status !== 'complete' && lookup.status !== 'error' && (
             <div className="capture-box">
               <p>Scan this QR code on your phone to take or upload the shoe photo:</p>
               <img className="qr-code" src={qrCodeUrl} alt={`QR code for ${lookup.captureUrl}`} />
@@ -650,7 +771,15 @@ function App() {
           )}
 
           <div className="actions-row">
-            <button className="primary-button" type="button" data-focusable onClick={() => setScreen('home')}>
+            <button
+              className="primary-button"
+              type="button"
+              data-focusable
+              onClick={() => {
+                stopCamera()
+                setScreen('home')
+              }}
+            >
               Home
             </button>
             <button className="text-button" type="button" data-focusable onClick={handleImageLookup}>

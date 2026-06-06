@@ -324,7 +324,8 @@ select {
 
 .capture-box,
 .result-box,
-.pair-code-card {
+.pair-code-card,
+.camera-card {
   display: grid;
   gap: 10px;
   padding: 18px;
@@ -335,7 +336,8 @@ select {
 
 .capture-box strong,
 .result-box strong,
-.pair-code-card strong {
+.pair-code-card strong,
+.camera-card strong {
   color: #f8fbff;
   font-size: clamp(34px, 11vw, 58px);
   line-height: 1;
@@ -346,6 +348,7 @@ select {
 .result-box span,
 .result-box small,
 .pair-code-card span,
+.camera-card span,
 .status-message {
   color: rgba(255, 255, 255, 0.72);
   overflow-wrap: anywhere;
@@ -368,6 +371,14 @@ select {
   padding: 10px;
   border-radius: 20px;
   background: #fff;
+}
+
+.camera-card video {
+  width: 100%;
+  max-height: 260px;
+  border-radius: 20px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 @media (max-width: 480px) {

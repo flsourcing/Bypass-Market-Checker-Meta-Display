@@ -100,6 +100,21 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
   return data as T
 }
 
+async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data?.error ?? 'Upload failed')
+  }
+
+  return data as T
+}
+
 export async function register(email: string, password: string) {
   return apiRequest<{ user: User; session: Session }>('/auth/register', {
     method: 'POST',
@@ -156,6 +171,16 @@ export async function getImageLookup(token: string, lookupId: string) {
   return apiRequest<{ lookup: ImageLookup }>(`/lookups/${encodeURIComponent(lookupId)}`, {
     token,
   })
+}
+
+export async function uploadLookupImage(captureCode: string, image: Blob) {
+  const formData = new FormData()
+  formData.set('image', image, 'glasses-capture.jpg')
+
+  return uploadRequest<{ lookup: ImageLookup }>(
+    `/lookups/capture/${encodeURIComponent(captureCode)}/image`,
+    formData,
+  )
 }
 
 export async function createDevicePairing(deviceName = 'Meta Display') {
