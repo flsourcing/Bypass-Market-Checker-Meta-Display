@@ -445,6 +445,7 @@ function App() {
                   .join(' • ') || 'No product details returned'}
               </span>
               <small>Confidence: {lookup.result?.confidence ?? 0}%</small>
+              {lookup.result?.notes && <small>{lookup.result.notes}</small>}
             </div>
           )}
 
