@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Xcode local user state
+*.xcuserstate
+xcuserdata/
+DerivedData/

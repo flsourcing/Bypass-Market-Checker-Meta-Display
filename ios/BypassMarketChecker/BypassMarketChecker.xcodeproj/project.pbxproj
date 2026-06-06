@@ -1,0 +1,599 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		30FBB5BD2FD3F5E4006EA821 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = 30FBB5BC2FD3F5E4006EA821 /* MWDATCamera */; };
+		30FBB5BF2FD3F5E4006EA821 /* MWDATCore in Frameworks */ = {isa = PBXBuildFile; productRef = 30FBB5BE2FD3F5E4006EA821 /* MWDATCore */; };
+		30FBB5C12FD3F5E4006EA821 /* MWDATDisplay in Frameworks */ = {isa = PBXBuildFile; productRef = 30FBB5C02FD3F5E4006EA821 /* MWDATDisplay */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		30FBB59F2FD3F533006EA821 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 30FBB5862FD3F532006EA821 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 30FBB58D2FD3F532006EA821;
+			remoteInfo = BypassMarketChecker;
+		};
+		30FBB5A92FD3F533006EA821 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 30FBB5862FD3F532006EA821 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 30FBB58D2FD3F532006EA821;
+			remoteInfo = BypassMarketChecker;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		30FBB58E2FD3F532006EA821 /* BypassMarketChecker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BypassMarketChecker.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		30FBB59E2FD3F533006EA821 /* BypassMarketCheckerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BypassMarketCheckerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		30FBB5A82FD3F533006EA821 /* BypassMarketCheckerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BypassMarketCheckerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		30FBB5902FD3F532006EA821 /* BypassMarketChecker */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BypassMarketChecker;
+			sourceTree = "<group>";
+		};
+		30FBB5A12FD3F533006EA821 /* BypassMarketCheckerTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BypassMarketCheckerTests;
+			sourceTree = "<group>";
+		};
+		30FBB5AB2FD3F533006EA821 /* BypassMarketCheckerUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BypassMarketCheckerUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		30FBB58B2FD3F532006EA821 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				30FBB5C12FD3F5E4006EA821 /* MWDATDisplay in Frameworks */,
+				30FBB5BD2FD3F5E4006EA821 /* MWDATCamera in Frameworks */,
+				30FBB5BF2FD3F5E4006EA821 /* MWDATCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		30FBB59B2FD3F533006EA821 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		30FBB5A52FD3F533006EA821 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		30FBB5852FD3F532006EA821 = {
+			isa = PBXGroup;
+			children = (
+				30FBB5902FD3F532006EA821 /* BypassMarketChecker */,
+				30FBB5A12FD3F533006EA821 /* BypassMarketCheckerTests */,
+				30FBB5AB2FD3F533006EA821 /* BypassMarketCheckerUITests */,
+				30FBB58F2FD3F532006EA821 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		30FBB58F2FD3F532006EA821 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				30FBB58E2FD3F532006EA821 /* BypassMarketChecker.app */,
+				30FBB59E2FD3F533006EA821 /* BypassMarketCheckerTests.xctest */,
+				30FBB5A82FD3F533006EA821 /* BypassMarketCheckerUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		30FBB58D2FD3F532006EA821 /* BypassMarketChecker */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 30FBB5B22FD3F533006EA821 /* Build configuration list for PBXNativeTarget "BypassMarketChecker" */;
+			buildPhases = (
+				30FBB58A2FD3F532006EA821 /* Sources */,
+				30FBB58B2FD3F532006EA821 /* Frameworks */,
+				30FBB58C2FD3F532006EA821 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				30FBB5902FD3F532006EA821 /* BypassMarketChecker */,
+			);
+			name = BypassMarketChecker;
+			packageProductDependencies = (
+				30FBB5BC2FD3F5E4006EA821 /* MWDATCamera */,
+				30FBB5BE2FD3F5E4006EA821 /* MWDATCore */,
+				30FBB5C02FD3F5E4006EA821 /* MWDATDisplay */,
+			);
+			productName = BypassMarketChecker;
+			productReference = 30FBB58E2FD3F532006EA821 /* BypassMarketChecker.app */;
+			productType = "com.apple.product-type.application";
+		};
+		30FBB59D2FD3F533006EA821 /* BypassMarketCheckerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 30FBB5B52FD3F533006EA821 /* Build configuration list for PBXNativeTarget "BypassMarketCheckerTests" */;
+			buildPhases = (
+				30FBB59A2FD3F533006EA821 /* Sources */,
+				30FBB59B2FD3F533006EA821 /* Frameworks */,
+				30FBB59C2FD3F533006EA821 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				30FBB5A02FD3F533006EA821 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				30FBB5A12FD3F533006EA821 /* BypassMarketCheckerTests */,
+			);
+			name = BypassMarketCheckerTests;
+			packageProductDependencies = (
+			);
+			productName = BypassMarketCheckerTests;
+			productReference = 30FBB59E2FD3F533006EA821 /* BypassMarketCheckerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		30FBB5A72FD3F533006EA821 /* BypassMarketCheckerUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 30FBB5B82FD3F533006EA821 /* Build configuration list for PBXNativeTarget "BypassMarketCheckerUITests" */;
+			buildPhases = (
+				30FBB5A42FD3F533006EA821 /* Sources */,
+				30FBB5A52FD3F533006EA821 /* Frameworks */,
+				30FBB5A62FD3F533006EA821 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				30FBB5AA2FD3F533006EA821 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				30FBB5AB2FD3F533006EA821 /* BypassMarketCheckerUITests */,
+			);
+			name = BypassMarketCheckerUITests;
+			packageProductDependencies = (
+			);
+			productName = BypassMarketCheckerUITests;
+			productReference = 30FBB5A82FD3F533006EA821 /* BypassMarketCheckerUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		30FBB5862FD3F532006EA821 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1620;
+				LastUpgradeCheck = 1620;
+				TargetAttributes = {
+					30FBB58D2FD3F532006EA821 = {
+						CreatedOnToolsVersion = 16.2;
+					};
+					30FBB59D2FD3F533006EA821 = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = 30FBB58D2FD3F532006EA821;
+					};
+					30FBB5A72FD3F533006EA821 = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = 30FBB58D2FD3F532006EA821;
+					};
+				};
+			};
+			buildConfigurationList = 30FBB5892FD3F532006EA821 /* Build configuration list for PBXProject "BypassMarketChecker" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 30FBB5852FD3F532006EA821;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				30FBB5BB2FD3F5E4006EA821 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 30FBB58F2FD3F532006EA821 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				30FBB58D2FD3F532006EA821 /* BypassMarketChecker */,
+				30FBB59D2FD3F533006EA821 /* BypassMarketCheckerTests */,
+				30FBB5A72FD3F533006EA821 /* BypassMarketCheckerUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		30FBB58C2FD3F532006EA821 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		30FBB59C2FD3F533006EA821 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		30FBB5A62FD3F533006EA821 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		30FBB58A2FD3F532006EA821 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		30FBB59A2FD3F533006EA821 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		30FBB5A42FD3F533006EA821 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		30FBB5A02FD3F533006EA821 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 30FBB58D2FD3F532006EA821 /* BypassMarketChecker */;
+			targetProxy = 30FBB59F2FD3F533006EA821 /* PBXContainerItemProxy */;
+		};
+		30FBB5AA2FD3F533006EA821 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 30FBB58D2FD3F532006EA821 /* BypassMarketChecker */;
+			targetProxy = 30FBB5A92FD3F533006EA821 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		30FBB5B02FD3F533006EA821 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		30FBB5B12FD3F533006EA821 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		30FBB5B32FD3F533006EA821 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"BypassMarketChecker/Preview Content\"";
+				DEVELOPMENT_TEAM = JM52FT93Z2;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = bypass.BypassMarketChecker;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		30FBB5B42FD3F533006EA821 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"BypassMarketChecker/Preview Content\"";
+				DEVELOPMENT_TEAM = JM52FT93Z2;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = bypass.BypassMarketChecker;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		30FBB5B62FD3F533006EA821 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JM52FT93Z2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = bypass.BypassMarketCheckerTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BypassMarketChecker.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BypassMarketChecker";
+			};
+			name = Debug;
+		};
+		30FBB5B72FD3F533006EA821 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JM52FT93Z2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = bypass.BypassMarketCheckerTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BypassMarketChecker.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BypassMarketChecker";
+			};
+			name = Release;
+		};
+		30FBB5B92FD3F533006EA821 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JM52FT93Z2;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = bypass.BypassMarketCheckerUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = BypassMarketChecker;
+			};
+			name = Debug;
+		};
+		30FBB5BA2FD3F533006EA821 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JM52FT93Z2;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = bypass.BypassMarketCheckerUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = BypassMarketChecker;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		30FBB5892FD3F532006EA821 /* Build configuration list for PBXProject "BypassMarketChecker" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				30FBB5B02FD3F533006EA821 /* Debug */,
+				30FBB5B12FD3F533006EA821 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		30FBB5B22FD3F533006EA821 /* Build configuration list for PBXNativeTarget "BypassMarketChecker" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				30FBB5B32FD3F533006EA821 /* Debug */,
+				30FBB5B42FD3F533006EA821 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		30FBB5B52FD3F533006EA821 /* Build configuration list for PBXNativeTarget "BypassMarketCheckerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				30FBB5B62FD3F533006EA821 /* Debug */,
+				30FBB5B72FD3F533006EA821 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		30FBB5B82FD3F533006EA821 /* Build configuration list for PBXNativeTarget "BypassMarketCheckerUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				30FBB5B92FD3F533006EA821 /* Debug */,
+				30FBB5BA2FD3F533006EA821 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		30FBB5BB2FD3F5E4006EA821 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/facebook/meta-wearables-dat-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.7.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		30FBB5BC2FD3F5E4006EA821 /* MWDATCamera */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30FBB5BB2FD3F5E4006EA821 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATCamera;
+		};
+		30FBB5BE2FD3F5E4006EA821 /* MWDATCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30FBB5BB2FD3F5E4006EA821 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATCore;
+		};
+		30FBB5C02FD3F5E4006EA821 /* MWDATDisplay */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30FBB5BB2FD3F5E4006EA821 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATDisplay;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 30FBB5862FD3F532006EA821 /* Project object */;
+}
