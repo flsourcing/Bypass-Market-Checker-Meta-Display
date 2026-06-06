@@ -1,10 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import './App.css'
 
-type LookupMode = 'image' | 'barcode' | null
-
 function App() {
-  const [lookupMode, setLookupMode] = useState<LookupMode>(null)
   const focusableRefs = useRef<Array<HTMLButtonElement | null>>([])
 
   useEffect(() => {
@@ -44,7 +41,6 @@ function App() {
           }}
           className="lookup-button"
           type="button"
-          onClick={() => setLookupMode('image')}
         >
           Image Lookup
         </button>
@@ -55,16 +51,9 @@ function App() {
           }}
           className="lookup-button"
           type="button"
-          onClick={() => setLookupMode('barcode')}
         >
           Barcode Lookup
         </button>
-
-        <p className="lookup-status" aria-live="polite">
-          {lookupMode === 'image' && 'Image lookup selected'}
-          {lookupMode === 'barcode' && 'Barcode lookup selected'}
-          {lookupMode === null && 'Select a lookup mode'}
-        </p>
       </section>
     </main>
   )

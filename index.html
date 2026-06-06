@@ -23,7 +23,10 @@
 
       body {
         display: grid;
-        place-items: center;
+        align-items: end;
+        justify-items: center;
+        box-sizing: border-box;
+        padding: 0 0 74px;
         background:
           radial-gradient(circle at 50% 45%, rgba(98, 210, 255, 0.08), transparent 42%),
           rgba(5, 10, 20, 0.88);
@@ -76,20 +79,11 @@
         transform: scale(1.025);
       }
 
-      .lookup-status {
-        position: fixed;
-        bottom: 118px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 8px 14px;
-        border-radius: 999px;
-        color: rgba(255, 255, 255, 0.72);
-        background: rgba(0, 0, 0, 0.24);
-        font-size: 13px;
-        font-weight: 600;
-      }
-
       @media (max-width: 480px) {
+        body {
+          padding-bottom: 58px;
+        }
+
         .lookup-panel {
           width: min(420px, calc(100vw - 40px));
           gap: 12px;
@@ -108,25 +102,17 @@
   </head>
   <body>
     <main class="lookup-panel" aria-label="Bypass Market Checker">
-      <button class="lookup-button" type="button" data-mode="Image lookup selected">
+      <button class="lookup-button" type="button">
         Image Lookup
       </button>
-      <button class="lookup-button" type="button" data-mode="Barcode lookup selected">
+      <button class="lookup-button" type="button">
         Barcode Lookup
       </button>
     </main>
-    <p class="lookup-status" aria-live="polite">Select a lookup mode</p>
     <script>
       const buttons = Array.from(document.querySelectorAll('.lookup-button'))
-      const status = document.querySelector('.lookup-status')
 
       buttons[0]?.focus()
-
-      buttons.forEach((button) => {
-        button.addEventListener('click', () => {
-          status.textContent = button.dataset.mode
-        })
-      })
 
       window.addEventListener('keydown', (event) => {
         const currentIndex = buttons.indexOf(document.activeElement)

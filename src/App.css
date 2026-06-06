@@ -5,8 +5,9 @@
   padding: 0;
   box-sizing: border-box;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
+  padding-bottom: 74px;
   overflow: hidden;
 }
 
@@ -60,20 +61,11 @@
   transform: scale(1.025);
 }
 
-.lookup-status {
-  position: absolute;
-  bottom: 118px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 8px 14px;
-  border-radius: 999px;
-  color: rgba(255, 255, 255, 0.72);
-  background: rgba(0, 0, 0, 0.24);
-  font-size: 13px;
-  font-weight: 600;
-}
-
 @media (max-width: 480px) {
+  .app-shell {
+    padding-bottom: 58px;
+  }
+
   .lookup-panel {
     width: min(420px, calc(100vw - 40px));
     gap: 12px;
