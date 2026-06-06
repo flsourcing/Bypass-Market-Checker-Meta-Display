@@ -19,7 +19,7 @@ final class WearablesService: ObservableObject {
     @Published private(set) var lastPhoto: UIImage?
     @Published private(set) var bestMatch: ProductMatch?
 
-    private let wearables = Wearables.shared
+    private var isConfigured = false
     private var session: DeviceSession?
     private var stream: MWDATCamera.Stream?
     private var display: Display?
@@ -27,10 +27,17 @@ final class WearablesService: ObservableObject {
 
     init() {
         configure()
-        observeWearables()
+
+        if isConfigured {
+            observeWearables()
+        }
     }
 
     func registerWithMetaAI() {
+        guard let wearables = configuredWearables() else {
+            return
+        }
+
         Task {
             do {
                 status = "Opening Meta AI registration..."
@@ -43,6 +50,10 @@ final class WearablesService: ObservableObject {
     }
 
     func connectGlasses() {
+        guard let wearables = configuredWearables() else {
+            return
+        }
+
         Task {
             do {
                 status = "Requesting camera permission..."
@@ -113,6 +124,10 @@ final class WearablesService: ObservableObject {
     }
 
     func handleCallback(url: URL) {
+        guard let wearables = configuredWearables() else {
+            return
+        }
+
         Task {
             do {
                 _ = try await wearables.handleUrl(url)
@@ -126,13 +141,28 @@ final class WearablesService: ObservableObject {
     private func configure() {
         do {
             try Wearables.configure()
+            isConfigured = true
             status = "Meta Wearables SDK configured."
         } catch {
+            isConfigured = false
             status = "SDK configuration failed: \(error.localizedDescription)"
         }
     }
 
+    private func configuredWearables() -> (any WearablesInterface)? {
+        guard isConfigured else {
+            status = "Meta Wearables SDK is not configured yet."
+            return nil
+        }
+
+        return Wearables.shared
+    }
+
     private func observeWearables() {
+        guard let wearables = configuredWearables() else {
+            return
+        }
+
         Task {
             for await state in wearables.registrationStateStream() {
                 await MainActor.run {
