@@ -19,8 +19,10 @@ final class WearablesService: ObservableObject {
     @Published private(set) var lastPhoto: UIImage?
     @Published private(set) var bestMatch: ProductMatch?
     @Published private(set) var isCameraStreamReady = false
+    @Published private(set) var deviceSummary = "No DAT device details yet."
 
     private var isConfigured = false
+    private var deviceIdentifiers: [DeviceIdentifier] = []
     private var session: DeviceSession?
     private var stream: MWDATCamera.Stream?
     private var display: Display?
@@ -79,7 +81,14 @@ final class WearablesService: ObservableObject {
                 }
 
                 status = "Starting glasses session..."
-                let selector = AutoDeviceSelector(wearables: wearables)
+                refreshDeviceSummary(using: wearables)
+
+                guard let deviceIdentifier = preferredDeviceIdentifier(using: wearables) else {
+                    status = "No eligible DAT device yet. Keep glasses connected in Meta AI, then tap Connect Glasses again."
+                    return
+                }
+
+                let selector = SpecificDeviceSelector(device: deviceIdentifier)
                 let session = try wearables.createSession(deviceSelector: selector)
                 self.session = session
 
@@ -192,10 +201,42 @@ final class WearablesService: ObservableObject {
         Task {
             for await devices in wearables.devicesStream() {
                 await MainActor.run {
+                    self.deviceIdentifiers = devices
                     self.deviceCount = devices.count
+                    self.refreshDeviceSummary(using: wearables)
                 }
             }
         }
+    }
+
+    private func preferredDeviceIdentifier(using wearables: any WearablesInterface) -> DeviceIdentifier? {
+        let connectedDevice = deviceIdentifiers.first { identifier in
+            wearables.deviceForIdentifier(identifier)?.linkState == .connected
+        }
+
+        return connectedDevice ?? deviceIdentifiers.first
+    }
+
+    private func refreshDeviceSummary(using wearables: any WearablesInterface) {
+        guard !deviceIdentifiers.isEmpty else {
+            deviceSummary = "No devices published by DAT yet."
+            return
+        }
+
+        deviceSummary = deviceIdentifiers
+            .compactMap { identifier in
+                guard let device = wearables.deviceForIdentifier(identifier) else {
+                    return "\(identifier): unavailable"
+                }
+
+                return [
+                    device.nameOrId(),
+                    "type \(device.deviceType().rawValue)",
+                    "link \(String(describing: device.linkState))",
+                    "compat \(device.compatibility().displayString)",
+                ].joined(separator: " | ")
+            }
+            .joined(separator: "\n")
     }
 
     private func waitForStartedSession(_ session: DeviceSession) async throws {

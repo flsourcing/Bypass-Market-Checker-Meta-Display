@@ -65,6 +65,8 @@ struct ContentView: View {
                     "Camera stream: \(wearables.isCameraStreamReady ? "ready" : "not ready")",
                     systemImage: wearables.isCameraStreamReady ? "camera.fill" : "camera"
                 )
+                Text(wearables.deviceSummary)
+                    .font(.caption2)
             }
             .font(.caption)
             .foregroundStyle(.secondary)
