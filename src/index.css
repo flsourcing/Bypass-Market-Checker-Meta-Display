@@ -1,18 +1,18 @@
 :root {
-  --text: #5e6472;
-  --text-h: #07111f;
-  --bg: #eef4ff;
-  --panel: rgba(255, 255, 255, 0.88);
-  --muted: rgba(7, 17, 31, 0.06);
-  --border: rgba(7, 17, 31, 0.08);
-  --accent: #275efe;
-  --shadow: rgba(39, 94, 254, 0.08) 0 18px 45px;
+  --text: #a9b4c7;
+  --text-h: #f8fbff;
+  --bg: #050a14;
+  --panel: rgba(12, 20, 35, 0.9);
+  --muted: rgba(255, 255, 255, 0.07);
+  --border: rgba(255, 255, 255, 0.1);
+  --accent: #62d2ff;
+  --shadow: rgba(0, 0, 0, 0.35) 0 18px 45px;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: 18px/145% var(--sans);
+  font: 16px/140% var(--sans);
   letter-spacing: 0.18px;
   color: var(--text);
   background: var(--bg);
@@ -21,22 +21,6 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #a9b4c7;
-    --text-h: #f8fbff;
-    --bg: #050a14;
-    --panel: rgba(12, 20, 35, 0.9);
-    --muted: rgba(255, 255, 255, 0.07);
-    --border: rgba(255, 255, 255, 0.1);
-    --accent: #62d2ff;
-    --shadow: rgba(0, 0, 0, 0.35) 0 18px 45px;
-  }
 }
 
 #root {
@@ -50,9 +34,10 @@
 body {
   margin: 0;
   min-width: 320px;
+  min-height: 100svh;
   background:
-    radial-gradient(circle at 16% 6%, rgba(39, 94, 254, 0.24), transparent 32%),
-    radial-gradient(circle at 90% 18%, rgba(0, 184, 255, 0.18), transparent 26%),
+    radial-gradient(circle at 16% 6%, rgba(98, 210, 255, 0.16), transparent 32%),
+    radial-gradient(circle at 90% 18%, rgba(0, 184, 255, 0.12), transparent 26%),
     var(--bg);
 }
 
@@ -64,19 +49,16 @@ h2 {
 }
 
 h1 {
-  font-size: clamp(36px, 8vw, 56px);
-  letter-spacing: -1.68px;
-  line-height: 0.95;
-  margin: 0 0 16px;
+  font-size: clamp(28px, 7vw, 42px);
+  letter-spacing: -1px;
+  line-height: 1;
+  margin: 0 0 10px;
 }
 h2 {
   font-size: 24px;
   line-height: 118%;
   letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
+  margin: 0;
 }
 p {
   margin: 0;

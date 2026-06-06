@@ -1,0 +1,9 @@
+{
+  "name": "Bypass Market Checker",
+  "short_name": "Bypass",
+  "description": "Market-check products from Meta Ray-Ban Display glasses.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#050a14",
+  "theme_color": "#050a14"
+}

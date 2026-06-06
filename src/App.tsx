@@ -1,24 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
-type ScanMode = 'image-search' | 'barcode'
-
-type BarcodeResult = {
-  rawValue: string
-  format: string
-}
-
-type BarcodeDetectorConstructor = new (options?: {
-  formats?: string[]
-}) => {
-  detect(image: ImageBitmapSource): Promise<BarcodeResult[]>
-}
-
-declare global {
-  interface Window {
-    BarcodeDetector?: BarcodeDetectorConstructor
-  }
-}
+type Screen = 'home' | 'choices' | 'image-search' | 'barcode' | 'setup'
 
 const sampleSkuMatches = [
   {
@@ -34,205 +17,154 @@ const sampleSkuMatches = [
 ]
 
 function App() {
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [fileName, setFileName] = useState('')
-  const [activeMode, setActiveMode] = useState<ScanMode | null>(null)
-  const [status, setStatus] = useState('Ready to scan a product.')
-  const [barcode, setBarcode] = useState<BarcodeResult | null>(null)
-  const [isWorking, setIsWorking] = useState(false)
+  const [screen, setScreen] = useState<Screen>('home')
+  const [status, setStatus] = useState('Ready on Meta Ray-Ban Display.')
+  const focusableRefs = useRef<Array<HTMLButtonElement | null>>([])
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+  const actions = useMemo(
+    () => [
+      {
+        id: 'scan',
+        label: 'Scan Product',
+        detail: 'Open scan options',
+        onSelect: () => {
+          setScreen('choices')
+          setStatus('Choose Image Search or Barcode Scan.')
+        },
+      },
+      {
+        id: 'image',
+        label: 'Image Search',
+        detail: 'Demo SKU match',
+        onSelect: () => {
+          setScreen('image-search')
+          setStatus('Demo image result loaded.')
+        },
+      },
+      {
+        id: 'barcode',
+        label: 'Barcode Scan',
+        detail: 'Demo UPC result',
+        onSelect: () => {
+          setScreen('barcode')
+          setStatus('Demo barcode result loaded.')
+        },
+      },
+      {
+        id: 'setup',
+        label: 'Setup',
+        detail: 'How this runs',
+        onSelect: () => {
+          setScreen('setup')
+          setStatus('This is the glasses Web App path.')
+        },
+      },
+    ],
+    [],
+  )
 
-    if (!file) {
-      return
-    }
+  useEffect(() => {
+    focusableRefs.current[0]?.focus()
+  }, [])
 
-    setImageUrl((currentUrl) => {
-      if (currentUrl) {
-        URL.revokeObjectURL(currentUrl)
-      }
-
-      return URL.createObjectURL(file)
-    })
-    setFileName(file.name)
-    setActiveMode(null)
-    setBarcode(null)
-    setStatus('Photo loaded. Choose Image Search or Barcode Scan.')
-  }
-
-  const runImageSearch = () => {
-    if (!imageUrl) {
-      setStatus('Take or upload a product photo first.')
-      return
-    }
-
-    setIsWorking(true)
-    setActiveMode('image-search')
-    setBarcode(null)
-    setStatus('Looking for a likely product SKU...')
-
-    window.setTimeout(() => {
-      setIsWorking(false)
-      setStatus(
-        'Prototype result: replace this mock with a real vision/search API next.',
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const currentIndex = focusableRefs.current.findIndex(
+        (element) => element === document.activeElement,
       )
-    }, 650)
-  }
 
-  const runBarcodeScan = async () => {
-    if (!imageUrl) {
-      setStatus('Take or upload a product photo first.')
-      return
-    }
-
-    setIsWorking(true)
-    setActiveMode('barcode')
-    setBarcode(null)
-    setStatus('Scanning the image for Code 128 or UPC barcodes...')
-
-    try {
-      if (!window.BarcodeDetector) {
-        setStatus(
-          'Barcode scanning is not available in this browser yet. Try Chrome/Edge or add a ZXing fallback.',
-        )
-        return
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+        event.preventDefault()
+        const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % actions.length
+        focusableRefs.current[nextIndex]?.focus()
       }
 
-      const detector = new window.BarcodeDetector({
-        formats: ['code_128', 'upc_a', 'upc_e', 'ean_13'],
-      })
-      const response = await fetch(imageUrl)
-      const blob = await response.blob()
-      const bitmap = await createImageBitmap(blob)
-      const results = await detector.detect(bitmap)
-      const code128 = results.find((result) => result.format === 'code_128')
-      const firstResult = code128 ?? results[0]
-
-      if (!firstResult) {
-        setStatus('No barcode found. Try a brighter, closer photo of the tag.')
-        return
+      if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+        event.preventDefault()
+        const nextIndex =
+          currentIndex <= 0 ? actions.length - 1 : currentIndex - 1
+        focusableRefs.current[nextIndex]?.focus()
       }
-
-      setBarcode(firstResult)
-      setStatus(`${firstResult.format.toUpperCase()} detected.`)
-    } catch {
-      setStatus('Barcode scan failed. Try another photo with the barcode centered.')
-    } finally {
-      setIsWorking(false)
     }
-  }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [actions.length])
 
   return (
     <main className="app-shell">
       <section className="hero-card" aria-labelledby="app-title">
-        <p className="eyebrow">Meta Ray-Ban Display prototype</p>
+        <p className="eyebrow">Meta Ray-Ban Display Web App</p>
         <h1 id="app-title">Bypass Market Checker</h1>
         <p className="hero-copy">
-          Snap a product, then search for likely SKUs or scan a barcode from the
-          image. This first build is intentionally simple so we can wire in real
-          marketplace data next.
+          Launch this from the glasses app grid. Use Neural Band or temple input
+          to move through scan options and show quick market-check results.
         </p>
-
-        <label className="scan-button">
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleImageChange}
-          />
-          Scan Product
-        </label>
-
         <p className="status" role="status">
-          {isWorking ? 'Working...' : status}
+          {status}
         </p>
       </section>
 
-      <section className="preview-card" aria-label="Current scan">
-        {imageUrl ? (
-          <img src={imageUrl} alt={`Product scan ${fileName}`} />
-        ) : (
-          <div className="empty-preview">
-            <span>Camera Preview</span>
-            <small>Take or upload a product photo to begin.</small>
+      <section className="display-card" aria-label="Current app state">
+        {screen === 'home' && (
+          <div className="display-state">
+            <span className="display-icon">⌁</span>
+            <h2>Ready to check</h2>
+            <p>Press Enter on Scan Product to begin.</p>
+          </div>
+        )}
+
+        {screen === 'choices' && (
+          <div className="display-state">
+            <span className="display-icon">⌕</span>
+            <h2>Pick a scan mode</h2>
+            <p>Image Search finds likely SKUs. Barcode Scan flashes UPC data.</p>
+          </div>
+        )}
+
+        {screen === 'setup' && (
+          <div className="display-state">
+            <span className="display-icon">◎</span>
+            <h2>Runs as Web App</h2>
+            <p>Add the HTTPS URL in Meta AI → App Connections → Web Apps.</p>
+          </div>
+        )}
+
+        {screen === 'image-search' && (
+          <div className="display-state result-state">
+            <p className="eyebrow">Best match</p>
+            <h2>{sampleSkuMatches[0].title}</h2>
+            <div className="sku-pill">{sampleSkuMatches[0].sku}</div>
+            <p>Demo result. Real SKU search will need a vision/backend API.</p>
+          </div>
+        )}
+
+        {screen === 'barcode' && (
+          <div className="display-state result-state">
+            <p className="eyebrow">Barcode demo</p>
+            <h2>012345678905</h2>
+            <div className="flash-code">UPC</div>
+            <p>Browser barcode capture is limited on glasses Web Apps.</p>
           </div>
         )}
       </section>
 
       <section className="actions-grid" aria-label="Scan options">
-        <button
-          className="action-card"
-          type="button"
-          onClick={runImageSearch}
-          disabled={isWorking}
-        >
-          <span>Image Search</span>
-          <strong>Find SKU</strong>
-          <small>Prototype Nike SKU match from the product photo.</small>
-        </button>
-
-        <button
-          className="action-card"
-          type="button"
-          onClick={runBarcodeScan}
-          disabled={isWorking}
-        >
-          <span>Barcode Scan</span>
-          <strong>Flash UPC</strong>
-          <small>Looks for Code 128, UPC, or EAN barcodes in the image.</small>
-        </button>
-      </section>
-
-      {activeMode === 'image-search' && (
-        <section className="result-card" aria-label="Image search results">
-          <div>
-            <p className="eyebrow">Best match</p>
-            <h2>{sampleSkuMatches[0].title}</h2>
-          </div>
-          <div className="sku-pill">{sampleSkuMatches[0].sku}</div>
-          <div className="match-list">
-            {sampleSkuMatches.map((match) => (
-              <div key={match.sku} className="match-row">
-                <span>{match.title}</span>
-                <strong>{match.sku}</strong>
-                <small>{match.confidence}% confidence</small>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {activeMode === 'barcode' && (
-        <section className="result-card barcode-result" aria-label="Barcode result">
-          {barcode ? (
-            <>
-              <p className="eyebrow">{barcode.format.toUpperCase()}</p>
-              <h2>{barcode.rawValue}</h2>
-              <div className="flash-code">UPC</div>
-            </>
-          ) : (
-            <>
-              <p className="eyebrow">Barcode scanner</p>
-              <h2>No code yet</h2>
-              <p>Use a close, clear shot of the barcode label.</p>
-            </>
-          )}
-        </section>
-      )}
-
-      <section className="next-steps">
-        <h2>What needs to happen next</h2>
-        <div>
-          <p>
-            For real glasses camera capture, we will connect Meta&apos;s native
-            Device Access Toolkit through an iOS or Android companion app.
-          </p>
-          <p>
-            For real SKU lookup, we will add a vision API that identifies the
-            product, then query a market/search source for SKU and pricing data.
-          </p>
-        </div>
+        {actions.map((action, index) => (
+          <button
+            key={action.id}
+            ref={(element) => {
+              focusableRefs.current[index] = element
+            }}
+            className="action-card focusable"
+            type="button"
+            onClick={action.onSelect}
+          >
+            <span>{action.label}</span>
+            <strong>{action.detail}</strong>
+          </button>
+        ))}
       </section>
     </main>
   )
