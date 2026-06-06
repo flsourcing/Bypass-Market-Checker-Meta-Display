@@ -1,7 +1,7 @@
 :root {
   --text: #a9b4c7;
   --text-h: #f8fbff;
-  --bg: transparent;
+  --bg: #050a14;
   --panel: rgba(12, 20, 35, 0.9);
   --muted: rgba(255, 255, 255, 0.07);
   --border: rgba(255, 255, 255, 0.1);
@@ -15,7 +15,7 @@
   font: 16px/140% var(--sans);
   letter-spacing: 0.18px;
   color: var(--text);
-  background: transparent;
+  background: #050a14;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -26,7 +26,7 @@
 html {
   min-width: 320px;
   min-height: 100%;
-  background: transparent;
+  background: #050a14;
 }
 
 #root {
@@ -35,7 +35,7 @@ html {
   text-align: center;
   min-height: 100svh;
   box-sizing: border-box;
-  background: transparent;
+  background: #050a14;
 }
 
 body {
@@ -43,7 +43,9 @@ body {
   min-width: 320px;
   min-height: 100svh;
   overflow: hidden;
-  background: transparent;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(98, 210, 255, 0.08), transparent 42%),
+    rgba(5, 10, 20, 0.88);
 }
 
 h1,
