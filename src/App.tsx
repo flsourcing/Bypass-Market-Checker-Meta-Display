@@ -475,10 +475,12 @@ function App() {
               className="lookup-button"
               type="button"
               data-focusable
-              onClick={handleImageLookup}
+              onClick={() => {
+                void handleImageLookup(isDisplayApp ? { captureRequest: true } : undefined)
+              }}
               disabled={isBusy}
             >
-              Image Lookup
+              {isDisplayApp ? 'Image Lookup (Start Stream)' : 'Image Lookup'}
             </button>
 
             <button
@@ -641,7 +643,7 @@ function App() {
           {lookup && isDisplayApp && lookup.status !== 'complete' && lookup.status !== 'error' && (
             <div className="camera-card">
               <p className="status-message">Waiting for Mobile Stream Pair.</p>
-              <p className="status-message">Open the iOS companion app, tap Start Glasses, then Capture.</p>
+              <p className="status-message">Image Lookup triggered stream start request to companion.</p>
               <button
                 className="primary-button ready-button"
                 type="button"
@@ -651,7 +653,7 @@ function App() {
                   void handleImageLookup({ keepScreen: true, captureRequest: true })
                 }}
               >
-                Capture Frame
+                Capture Frame (Request)
               </button>
             </div>
           )}
