@@ -712,6 +712,9 @@ function App() {
 
           {lookup && isDisplayApp && lookup.status !== 'complete' && lookup.status !== 'error' && (
             <div className="camera-card">
+              <p className="status-message">
+                Waiting for the iOS companion to upload the latest glasses photo.
+              </p>
               {cameraStream ? (
                 <>
                   <video ref={videoRef} muted playsInline />
@@ -733,11 +736,11 @@ function App() {
                   disabled={isBusy}
                   onClick={handleStartCamera}
                 >
-                  Take Photo
+                  Try Web Camera
                 </button>
               )}
               {cameraError && <p className="status-message">{cameraError}</p>}
-              <p className="status-message">If camera is blocked, use phone upload:</p>
+              <p className="status-message">Fallback capture code:</p>
               <strong>{lookup.captureCode}</strong>
               <span>{lookup.captureUrl}</span>
             </div>
