@@ -223,6 +223,13 @@ select {
   background: rgba(98, 210, 255, 0.08);
 }
 
+.center-message.capture-mode {
+  position: static;
+  transform: none;
+  margin-top: 14px;
+  text-align: center;
+}
+
 .user-chip {
   position: absolute;
   left: 24px;
@@ -379,6 +386,19 @@ select {
   border-radius: 20px;
   object-fit: cover;
   background: rgba(255, 255, 255, 0.08);
+}
+
+.home-result {
+  width: min(520px, calc(100vw - 56px));
+  margin-top: 14px;
+}
+
+.captured-preview {
+  width: 100%;
+  max-height: 220px;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 @media (max-width: 480px) {

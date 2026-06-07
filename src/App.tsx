@@ -40,6 +40,7 @@ function App() {
   const [apiKey, setApiKey] = useState('')
   const [lookup, setLookup] = useState<ImageLookup | null>(null)
   const [streamPairLookupId, setStreamPairLookupId] = useState<string | null>(null)
+  const [displayCaptureArmed, setDisplayCaptureArmed] = useState(false)
   const [devicePairing, setDevicePairing] = useState<DevicePairing | null>(null)
   const [message, setMessage] = useState('')
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
@@ -301,6 +302,9 @@ function App() {
     if (!options?.keepScreen) {
       setScreen('lookup')
     }
+    if (isDisplayApp && options?.startStreamOnly) {
+      setDisplayCaptureArmed(true)
+    }
 
     try {
       const { lookup: createdLookup } = await createImageLookup(token)
@@ -332,6 +336,7 @@ function App() {
     setPairedDevices([])
     setLookup(null)
     setStreamPairLookupId(null)
+    setDisplayCaptureArmed(false)
     setDevicePairing(null)
     setScreen('auth')
   }
@@ -395,6 +400,18 @@ function App() {
       : isDisplayApp
         ? 'Waiting for Mobile Stream Pair'
         : message || 'Looking Up Product'
+  const displayLookupStatus = !lookup
+    ? 'Tap Capture to request a frame from companion.'
+    : lookup.status === 'pending'
+      ? lookup.id === streamPairLookupId
+        ? 'Live stream pair requested. Tap Capture when ready.'
+        : 'Capture requested. Waiting for companion upload.'
+      : lookup.status === 'processing'
+        ? 'Processing capture...'
+        : lookup.status === 'complete'
+          ? 'Capture complete.'
+          : lookup.error ?? 'Lookup failed'
+  const displayImageUrl = (lookup?.result as { imageUrl?: string | null } | null)?.imageUrl ?? null
   const qrCodeUrl = lookup
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(lookup.captureUrl)}`
     : ''
@@ -481,30 +498,67 @@ function App() {
       {screen === 'home' && (
         <section className="home-wrap" aria-label="Bypass Market Checker">
           <div className="user-chip">{user?.email}</div>
-          <section className="lookup-panel">
-            <button
-              className="lookup-button"
-              type="button"
-              data-focusable
-              onClick={() => {
-                void handleImageLookup(isDisplayApp ? { startStreamOnly: true } : undefined)
-              }}
-              disabled={isBusy}
-            >
-              {isDisplayApp ? 'Image Lookup (Start Live Stream)' : 'Image Lookup'}
-            </button>
+          {isDisplayApp && displayCaptureArmed ? (
+            <>
+              <section className="lookup-panel">
+                <button
+                  className="lookup-button"
+                  type="button"
+                  data-focusable
+                  onClick={() => {
+                    void handleImageLookup({ keepScreen: true, captureRequest: true })
+                  }}
+                  disabled={isBusy}
+                >
+                  Capture
+                </button>
+              </section>
+              {lookup?.status === 'complete' && (
+                <section className="glass-card result-box home-result" aria-label="Lookup Result">
+                  <p>SKU</p>
+                  <strong>{lookup.result?.sku ?? 'Not found'}</strong>
+                  <span>
+                    {[lookup.result?.brand, lookup.result?.model, lookup.result?.colorway]
+                      .filter(Boolean)
+                      .join(' • ') || 'No product details returned'}
+                  </span>
+                  <small>Confidence: {lookup.result?.confidence ?? 0}%</small>
+                  {lookup.result?.notes && <small>{lookup.result.notes}</small>}
+                  {displayImageUrl && (
+                    <img className="captured-preview" src={displayImageUrl} alt="Captured frame preview" />
+                  )}
+                </section>
+              )}
+              <p className="center-message capture-mode">{displayLookupStatus}</p>
+            </>
+          ) : (
+            <>
+              <section className="lookup-panel">
+                <button
+                  className="lookup-button"
+                  type="button"
+                  data-focusable
+                  onClick={() => {
+                    void handleImageLookup(isDisplayApp ? { keepScreen: true, startStreamOnly: true } : undefined)
+                  }}
+                  disabled={isBusy}
+                >
+                  Image Lookup
+                </button>
 
-            <button
-              className="lookup-button"
-              type="button"
-              data-focusable
-              onClick={() => setMessage('Barcode Lookup is next.')}
-            >
-              Barcode Lookup
-            </button>
-          </section>
-          {(needsKeyMessage || message) && (
-            <p className="center-message">{message || needsKeyMessage}</p>
+                <button
+                  className="lookup-button"
+                  type="button"
+                  data-focusable
+                  onClick={() => setMessage('Barcode Lookup is next.')}
+                >
+                  Barcode Lookup
+                </button>
+              </section>
+              {(needsKeyMessage || message) && (
+                <p className="center-message">{message || needsKeyMessage}</p>
+              )}
+            </>
           )}
         </section>
       )}
@@ -646,31 +700,10 @@ function App() {
         </section>
       )}
 
-      {screen === 'lookup' && (
+      {screen === 'lookup' && !isDisplayApp && (
         <section className="glass-card lookup-card" aria-label="Image Lookup">
           <p className="eyebrow">Image Lookup</p>
           <h1>{lookupStatus}</h1>
-
-          {lookup && isDisplayApp && lookup.status !== 'complete' && lookup.status !== 'error' && (
-            <div className="camera-card">
-              <p className="status-message">
-                {lookup.id === streamPairLookupId
-                  ? 'Live stream pairing requested. Waiting for companion stream.'
-                  : 'Live stream active. Ready to capture frame.'}
-              </p>
-              <button
-                className="primary-button ready-button"
-                type="button"
-                data-focusable
-                disabled={isBusy}
-                onClick={() => {
-                  void handleImageLookup({ keepScreen: true, captureRequest: true })
-                }}
-              >
-                Capture
-              </button>
-            </div>
-          )}
 
           {lookup && !isDisplayApp && lookup.status !== 'complete' && lookup.status !== 'error' && (
             <div className="capture-box">
