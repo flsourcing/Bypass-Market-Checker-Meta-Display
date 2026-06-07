@@ -39,6 +39,7 @@ function App() {
   const [provider, setProvider] = useState('gemini')
   const [apiKey, setApiKey] = useState('')
   const [lookup, setLookup] = useState<ImageLookup | null>(null)
+  const [streamPairLookupId, setStreamPairLookupId] = useState<string | null>(null)
   const [devicePairing, setDevicePairing] = useState<DevicePairing | null>(null)
   const [message, setMessage] = useState('')
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
@@ -278,7 +279,7 @@ function App() {
     }
   }
 
-  async function handleImageLookup(options?: { keepScreen?: boolean; captureRequest?: boolean }) {
+  async function handleImageLookup(options?: { keepScreen?: boolean; captureRequest?: boolean; startStreamOnly?: boolean }) {
     if (!token) {
       setScreen('auth')
       return
@@ -287,12 +288,16 @@ function App() {
     setIsBusy(true)
     setMessage(
       isDisplayApp && options?.captureRequest
-        ? 'Capture request sent. Waiting for Mobile Stream Pair'
+        ? 'Capture requested. Waiting for companion frame upload'
+        : isDisplayApp && options?.startStreamOnly
+          ? 'Starting live stream pair...'
         : isDisplayApp
           ? 'Waiting for Mobile Stream Pair'
           : 'Looking Up Product',
     )
-    setLookup(null)
+    if (!options?.captureRequest) {
+      setLookup(null)
+    }
     if (!options?.keepScreen) {
       setScreen('lookup')
     }
@@ -300,9 +305,14 @@ function App() {
     try {
       const { lookup: createdLookup } = await createImageLookup(token)
       setLookup(createdLookup)
+      if (isDisplayApp && options?.startStreamOnly) {
+        setStreamPairLookupId(createdLookup.id)
+      }
       setMessage(
         isDisplayApp && options?.captureRequest
-          ? 'Capture request sent. Waiting for Mobile Stream Pair'
+          ? 'Capture requested. Waiting for companion frame upload'
+          : isDisplayApp && options?.startStreamOnly
+            ? 'Live stream pair requested. Companion should auto-start glasses stream.'
           : isDisplayApp
             ? 'Waiting for Mobile Stream Pair'
             : 'Looking Up Product',
@@ -321,6 +331,7 @@ function App() {
     setApiKeys([])
     setPairedDevices([])
     setLookup(null)
+    setStreamPairLookupId(null)
     setDevicePairing(null)
     setScreen('auth')
   }
@@ -476,11 +487,11 @@ function App() {
               type="button"
               data-focusable
               onClick={() => {
-                void handleImageLookup(isDisplayApp ? { captureRequest: true } : undefined)
+                void handleImageLookup(isDisplayApp ? { startStreamOnly: true } : undefined)
               }}
               disabled={isBusy}
             >
-              {isDisplayApp ? 'Image Lookup (Start Stream)' : 'Image Lookup'}
+              {isDisplayApp ? 'Image Lookup (Start Live Stream)' : 'Image Lookup'}
             </button>
 
             <button
@@ -642,8 +653,11 @@ function App() {
 
           {lookup && isDisplayApp && lookup.status !== 'complete' && lookup.status !== 'error' && (
             <div className="camera-card">
-              <p className="status-message">Waiting for Mobile Stream Pair.</p>
-              <p className="status-message">Image Lookup triggered stream start request to companion.</p>
+              <p className="status-message">
+                {lookup.id === streamPairLookupId
+                  ? 'Live stream pairing requested. Waiting for companion stream.'
+                  : 'Live stream active. Ready to capture frame.'}
+              </p>
               <button
                 className="primary-button ready-button"
                 type="button"
@@ -653,7 +667,7 @@ function App() {
                   void handleImageLookup({ keepScreen: true, captureRequest: true })
                 }}
               >
-                Capture Frame (Request)
+                Capture
               </button>
             </div>
           )}
