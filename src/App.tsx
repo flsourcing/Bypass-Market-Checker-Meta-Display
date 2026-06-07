@@ -278,21 +278,35 @@ function App() {
     }
   }
 
-  async function handleImageLookup() {
+  async function handleImageLookup(options?: { keepScreen?: boolean; captureRequest?: boolean }) {
     if (!token) {
       setScreen('auth')
       return
     }
 
     setIsBusy(true)
-    setMessage(isDisplayApp ? 'Waiting for Mobile Stream Pair' : 'Looking Up Product')
+    setMessage(
+      isDisplayApp && options?.captureRequest
+        ? 'Capture request sent. Waiting for Mobile Stream Pair'
+        : isDisplayApp
+          ? 'Waiting for Mobile Stream Pair'
+          : 'Looking Up Product',
+    )
     setLookup(null)
-    setScreen('lookup')
+    if (!options?.keepScreen) {
+      setScreen('lookup')
+    }
 
     try {
       const { lookup: createdLookup } = await createImageLookup(token)
       setLookup(createdLookup)
-      setMessage(isDisplayApp ? 'Waiting for Mobile Stream Pair' : 'Looking Up Product')
+      setMessage(
+        isDisplayApp && options?.captureRequest
+          ? 'Capture request sent. Waiting for Mobile Stream Pair'
+          : isDisplayApp
+            ? 'Waiting for Mobile Stream Pair'
+            : 'Looking Up Product',
+      )
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not start image lookup')
     } finally {
@@ -628,6 +642,17 @@ function App() {
             <div className="camera-card">
               <p className="status-message">Waiting for Mobile Stream Pair.</p>
               <p className="status-message">Open the iOS companion app, tap Start Glasses, then Capture.</p>
+              <button
+                className="primary-button ready-button"
+                type="button"
+                data-focusable
+                disabled={isBusy}
+                onClick={() => {
+                  void handleImageLookup({ keepScreen: true, captureRequest: true })
+                }}
+              >
+                Capture Frame
+              </button>
             </div>
           )}
 
@@ -669,9 +694,11 @@ function App() {
             >
               Home
             </button>
-            <button className="text-button" type="button" data-focusable onClick={handleImageLookup}>
-              Retry
-            </button>
+            {!isDisplayApp && (
+              <button className="text-button" type="button" data-focusable onClick={() => void handleImageLookup()}>
+                Retry
+              </button>
+            )}
           </div>
         </section>
       )}
