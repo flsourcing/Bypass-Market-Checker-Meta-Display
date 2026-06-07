@@ -280,7 +280,7 @@ function App() {
     }
   }
 
-  async function handleImageLookup(options?: { keepScreen?: boolean; captureRequest?: boolean; startStreamOnly?: boolean }) {
+    async function handleImageLookup(options?: { keepScreen?: boolean; captureRequest?: boolean; startStreamOnly?: boolean }) {
     if (!token) {
       setScreen('auth')
       return
@@ -289,7 +289,7 @@ function App() {
     setIsBusy(true)
     setMessage(
       isDisplayApp && options?.captureRequest
-        ? 'Capture requested. Waiting for companion frame upload'
+        ? 'Processing capture...'
         : isDisplayApp && options?.startStreamOnly
           ? 'Starting live stream pair...'
         : isDisplayApp
@@ -314,7 +314,7 @@ function App() {
       }
       setMessage(
         isDisplayApp && options?.captureRequest
-          ? 'Capture requested. Waiting for companion frame upload'
+          ? 'Processing capture...'
           : isDisplayApp && options?.startStreamOnly
             ? 'Live stream pair requested. Companion should auto-start glasses stream.'
           : isDisplayApp
@@ -405,7 +405,7 @@ function App() {
     : lookup.status === 'pending'
       ? lookup.id === streamPairLookupId
         ? 'Live stream pair requested. Tap Capture when ready.'
-        : 'Capture requested. Waiting for companion upload.'
+        : 'Processing capture...'
       : lookup.status === 'processing'
         ? 'Processing capture...'
         : lookup.status === 'complete'
