@@ -496,11 +496,14 @@ function App() {
       )}
 
       {screen === 'home' && (
-        <section className="home-wrap" aria-label="Bypass Market Checker">
+        <section
+          className={`home-wrap ${isDisplayApp && displayCaptureArmed ? 'capture-home-wrap' : ''}`}
+          aria-label="Bypass Market Checker"
+        >
           <div className="user-chip">{user?.email}</div>
           {isDisplayApp && displayCaptureArmed ? (
             <>
-              <section className="lookup-panel">
+              <section className="lookup-panel capture-floating-panel">
                 <button
                   className="lookup-button"
                   type="button"

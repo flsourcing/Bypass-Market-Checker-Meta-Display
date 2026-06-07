@@ -22,6 +22,12 @@
   position: relative;
 }
 
+.capture-home-wrap {
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 120px;
+}
+
 .lookup-panel {
   width: min(520px, calc(100vw - 56px));
   display: flex;
@@ -37,6 +43,21 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
   backdrop-filter: blur(18px) saturate(1.25);
   -webkit-backdrop-filter: blur(18px) saturate(1.25);
+}
+
+.capture-floating-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  width: min(340px, calc(100vw - 56px));
+  z-index: 5;
+  padding: 14px;
+}
+
+.capture-floating-panel .lookup-button {
+  width: 100%;
+  min-width: 0;
 }
 
 .lookup-button,
@@ -391,6 +412,7 @@ select {
 .home-result {
   width: min(520px, calc(100vw - 56px));
   margin-top: 14px;
+  margin-bottom: 130px;
 }
 
 .captured-preview {
