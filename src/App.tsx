@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
 import {
@@ -19,7 +19,6 @@ import {
   revealApiKey,
   saveApiKey,
   setStoredToken,
-  uploadLookupImage,
 } from './api'
 import type { ApiKeyRecord, DevicePairing, ImageLookup, PairedDevice, User } from './api'
 
@@ -44,9 +43,6 @@ function App() {
   const [message, setMessage] = useState('')
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
-  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
-  const [cameraError, setCameraError] = useState('')
-  const videoRef = useRef<HTMLVideoElement | null>(null)
 
   useEffect(() => {
     const firstFocusable = document.querySelector<HTMLElement>('[data-focusable]')
@@ -166,21 +162,6 @@ function App() {
     return () => window.clearInterval(interval)
   }, [lookup, token])
 
-  useEffect(() => {
-    const video = videoRef.current
-
-    if (!video || !cameraStream) {
-      return
-    }
-
-    video.srcObject = cameraStream
-    void video.play()
-
-    return () => {
-      video.srcObject = null
-    }
-  }, [cameraStream])
-
   async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setIsBusy(true)
@@ -201,11 +182,6 @@ function App() {
     } finally {
       setIsBusy(false)
     }
-  }
-
-  function stopCamera() {
-    cameraStream?.getTracks().forEach((track) => track.stop())
-    setCameraStream(null)
   }
 
   async function refreshApiKeys(activeToken = token) {
@@ -309,15 +285,14 @@ function App() {
     }
 
     setIsBusy(true)
-    setMessage('Looking Up Product')
-    setCameraError('')
+    setMessage(isDisplayApp ? 'Waiting for Mobile Stream Pair' : 'Looking Up Product')
     setLookup(null)
     setScreen('lookup')
 
     try {
       const { lookup: createdLookup } = await createImageLookup(token)
       setLookup(createdLookup)
-      setMessage('Looking Up Product')
+      setMessage(isDisplayApp ? 'Waiting for Mobile Stream Pair' : 'Looking Up Product')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not start image lookup')
     } finally {
@@ -325,69 +300,7 @@ function App() {
     }
   }
 
-  async function handleStartCamera() {
-    setCameraError('')
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError('Camera unavailable, use phone upload.')
-      return
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-        audio: false,
-      })
-      setCameraStream(stream)
-    } catch {
-      setCameraError('Camera unavailable, use phone upload.')
-    }
-  }
-
-  async function handleCapturePhoto() {
-    if (!lookup || !videoRef.current) {
-      return
-    }
-
-    setIsBusy(true)
-    setCameraError('')
-    setMessage('Looking Up Product')
-
-    try {
-      const video = videoRef.current
-      const canvas = document.createElement('canvas')
-      canvas.width = video.videoWidth || 1280
-      canvas.height = video.videoHeight || 720
-      const context = canvas.getContext('2d')
-
-      if (!context) {
-        throw new Error('Could not capture camera frame')
-      }
-
-      context.drawImage(video, 0, 0, canvas.width, canvas.height)
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((value) => {
-          if (value) {
-            resolve(value)
-            return
-          }
-
-          reject(new Error('Could not create camera image'))
-        }, 'image/jpeg', 0.9)
-      })
-      const { lookup: updatedLookup } = await uploadLookupImage(lookup.captureCode, blob)
-
-      stopCamera()
-      setLookup(updatedLookup)
-    } catch (error) {
-      setCameraError(error instanceof Error ? error.message : 'Camera unavailable, use phone upload.')
-    } finally {
-      setIsBusy(false)
-    }
-  }
-
   function handleLogout() {
-    stopCamera()
     clearStoredToken()
     setToken(null)
     setUser(null)
@@ -454,7 +367,9 @@ function App() {
     ? 'Lookup Complete'
     : lookup?.status === 'error'
       ? 'Lookup Failed'
-      : message || 'Looking Up Product'
+      : isDisplayApp
+        ? 'Waiting for Mobile Stream Pair'
+        : message || 'Looking Up Product'
   const qrCodeUrl = lookup
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(lookup.captureUrl)}`
     : ''
@@ -468,7 +383,6 @@ function App() {
           aria-label="Settings"
           data-focusable
           onClick={() => {
-            stopCamera()
             setMessage('')
             setScreen('settings')
           }}
@@ -712,37 +626,8 @@ function App() {
 
           {lookup && isDisplayApp && lookup.status !== 'complete' && lookup.status !== 'error' && (
             <div className="camera-card">
-              <p className="status-message">
-                Waiting for the iOS companion to upload the latest glasses photo.
-              </p>
-              {cameraStream ? (
-                <>
-                  <video ref={videoRef} muted playsInline />
-                  <button
-                    className="primary-button ready-button"
-                    type="button"
-                    data-focusable
-                    disabled={isBusy}
-                    onClick={handleCapturePhoto}
-                  >
-                    Take Photo
-                  </button>
-                </>
-              ) : (
-                <button
-                  className="primary-button ready-button"
-                  type="button"
-                  data-focusable
-                  disabled={isBusy}
-                  onClick={handleStartCamera}
-                >
-                  Try Web Camera
-                </button>
-              )}
-              {cameraError && <p className="status-message">{cameraError}</p>}
-              <p className="status-message">Fallback capture code:</p>
-              <strong>{lookup.captureCode}</strong>
-              <span>{lookup.captureUrl}</span>
+              <p className="status-message">Waiting for Mobile Stream Pair.</p>
+              <p className="status-message">Open the iOS companion app, tap Start Glasses, then Capture.</p>
             </div>
           )}
 
@@ -779,7 +664,6 @@ function App() {
               type="button"
               data-focusable
               onClick={() => {
-                stopCamera()
                 setScreen('home')
               }}
             >
