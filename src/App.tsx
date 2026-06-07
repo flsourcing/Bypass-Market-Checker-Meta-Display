@@ -411,7 +411,6 @@ function App() {
         : lookup.status === 'complete'
           ? 'Capture complete.'
           : lookup.error ?? 'Lookup failed'
-  const displayImageUrl = (lookup?.result as { imageUrl?: string | null } | null)?.imageUrl ?? null
   const qrCodeUrl = lookup
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(lookup.captureUrl)}`
     : ''
@@ -521,18 +520,16 @@ function App() {
                   <p>SKU</p>
                   <strong>{lookup.result?.sku ?? 'Not found'}</strong>
                   <span>
-                    {[lookup.result?.brand, lookup.result?.model, lookup.result?.colorway]
+                    {[lookup.result?.brand, lookup.result?.model]
                       .filter(Boolean)
-                      .join(' • ') || 'No product details returned'}
+                      .join(' ') || 'Unknown product'}
                   </span>
-                  <small>Confidence: {lookup.result?.confidence ?? 0}%</small>
-                  {lookup.result?.notes && <small>{lookup.result.notes}</small>}
-                  {displayImageUrl && (
-                    <img className="captured-preview" src={displayImageUrl} alt="Captured frame preview" />
-                  )}
+                  <small>{lookup.result?.confidence ?? 0}% accurate</small>
                 </section>
               )}
-              <p className="center-message capture-mode">{displayLookupStatus}</p>
+              {lookup?.status !== 'complete' && (
+                <p className="center-message capture-mode">{displayLookupStatus}</p>
+              )}
             </>
           ) : (
             <>
