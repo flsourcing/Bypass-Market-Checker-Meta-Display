@@ -275,8 +275,7 @@ function App() {
           if (
             isDisplayApp
             && captureSessionActive
-            && latestLookup.id !== streamPairLookupId
-            && (latestLookup.status === 'processing' || latestLookup.status === 'complete')
+            && (latestLookup.status === 'processing' || latestLookup.status === 'complete' || latestLookup.status === 'error')
           ) {
             setCaptureSessionActive(false)
           }
@@ -359,6 +358,11 @@ function App() {
         setMessage(error instanceof Error ? error.message : 'Could not start capture')
         return
       }
+    }
+
+    if (lookup?.status === 'pending' && lookup.captureMode === 'capture') {
+      setMessage('Processing Capture...')
+      return
     }
 
     if (activeLookupKind === 'barcode') {
@@ -818,8 +822,8 @@ function App() {
         ? 'Processing Capture...'
         : isDisplayApp && options?.startStreamOnly
           ? kind === 'barcode'
-            ? 'Starting barcode stream pair...'
-            : 'Starting live stream pair...'
+            ? 'Preparing barcode lookup...'
+            : 'Preparing image lookup...'
         : isDisplayApp
           ? 'Waiting for Mobile Stream Pair'
           : kind === 'barcode'
@@ -851,8 +855,8 @@ function App() {
           ? 'Processing Capture...'
           : isDisplayApp && options?.startStreamOnly
             ? kind === 'barcode'
-              ? 'Barcode stream pair requested. Tap Capture when ready.'
-              : 'Live stream pair requested. Companion should auto-start glasses stream.'
+              ? 'Ready for barcode. Tap Capture when you want a photo.'
+              : 'Ready for image lookup. Tap Capture when you want a photo.'
           : isDisplayApp
             ? 'Waiting for Mobile Stream Pair'
             : kind === 'barcode'
