@@ -39,7 +39,7 @@ export type ImageLookup = {
   captureUrl: string
   provider: string
   lookupType: 'image' | 'barcode'
-  captureMode: 'stream_pair' | 'capture'
+  captureMode: 'stream_pair' | 'capture' | 'mobile'
   status: 'pending' | 'processing' | 'complete' | 'error'
   result: LookupResult | null
   error: string | null
