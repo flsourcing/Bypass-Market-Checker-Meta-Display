@@ -43,6 +43,7 @@ function App() {
   const [lookupImageObjectUrl, setLookupImageObjectUrl] = useState<string | null>(null)
   const [streamPairLookupId, setStreamPairLookupId] = useState<string | null>(null)
   const [displayCaptureArmed, setDisplayCaptureArmed] = useState(false)
+  const [captureSessionActive, setCaptureSessionActive] = useState(false)
   const [devicePairing, setDevicePairing] = useState<DevicePairing | null>(null)
   const [message, setMessage] = useState('')
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
@@ -157,14 +158,24 @@ function App() {
 
     const interval = window.setInterval(() => {
       getImageLookup(token, lookup.id)
-        .then(({ lookup: latestLookup }) => setLookup(latestLookup))
+        .then(({ lookup: latestLookup }) => {
+          setLookup(latestLookup)
+          if (
+            isDisplayApp
+            && captureSessionActive
+            && latestLookup.id !== streamPairLookupId
+            && (latestLookup.status === 'processing' || latestLookup.status === 'complete')
+          ) {
+            setCaptureSessionActive(false)
+          }
+        })
         .catch((error: unknown) => {
           setMessage(error instanceof Error ? error.message : 'Unable to check lookup status')
         })
-    }, isDisplayApp ? 1200 : 3000)
+    }, isDisplayApp && captureSessionActive ? 800 : isDisplayApp ? 1200 : 3000)
 
     return () => window.clearInterval(interval)
-  }, [isDisplayApp, lookup, token])
+  }, [captureSessionActive, isDisplayApp, lookup, streamPairLookupId, token])
 
   useEffect(() => {
     if (!token || !lookup?.imageUrl || lookup.status !== 'complete') {
@@ -203,7 +214,18 @@ function App() {
     setLookupImageObjectUrl(null)
     setStreamPairLookupId(null)
     setDisplayCaptureArmed(false)
+    setCaptureSessionActive(false)
     setMessage('')
+  }
+
+  async function handleDisplayCapture() {
+    if (!token) {
+      return
+    }
+
+    setCaptureSessionActive(true)
+    setMessage('Processing Capture...')
+    await handleImageLookup({ keepScreen: true, captureRequest: true })
   }
 
   function formatLookupDate(value: string) {
@@ -380,7 +402,7 @@ function App() {
     setIsBusy(true)
     setMessage(
       isDisplayApp && options?.captureRequest
-        ? 'Processing capture...'
+        ? 'Processing Capture...'
         : isDisplayApp && options?.startStreamOnly
           ? 'Starting live stream pair...'
         : isDisplayApp
@@ -405,7 +427,7 @@ function App() {
       }
       setMessage(
         isDisplayApp && options?.captureRequest
-          ? 'Processing capture...'
+          ? 'Processing Capture...'
           : isDisplayApp && options?.startStreamOnly
             ? 'Live stream pair requested. Companion should auto-start glasses stream.'
           : isDisplayApp
@@ -429,6 +451,7 @@ function App() {
     setLookupImageObjectUrl(null)
     setStreamPairLookupId(null)
     setDisplayCaptureArmed(false)
+    setCaptureSessionActive(false)
     setDevicePairing(null)
     setScreen('auth')
   }
@@ -497,12 +520,15 @@ function App() {
     : lookup.status === 'pending'
       ? lookup.id === streamPairLookupId
         ? 'Live stream pair requested. Tap Capture when ready.'
-        : 'Processing capture...'
+        : 'Processing Capture...'
       : lookup.status === 'processing'
-        ? 'Processing capture...'
+        ? 'Processing Capture...'
         : lookup.status === 'complete'
           ? 'Capture complete.'
           : lookup.error ?? 'Lookup failed'
+  const isDisplayCaptureBusy = captureSessionActive
+    || lookup?.status === 'processing'
+    || (lookup?.status === 'pending' && lookup.id !== streamPairLookupId)
   const qrCodeUrl = lookup
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(lookup.captureUrl)}`
     : ''
@@ -625,6 +651,12 @@ function App() {
                     </button>
                   </section>
                 </>
+              ) : isDisplayCaptureBusy ? (
+                <section className="glass-card processing-card home-result" aria-label="Processing Capture">
+                  <p className="eyebrow">Image Lookup</p>
+                  <h1 className="processing-title">Processing Capture</h1>
+                  <p className="center-message capture-mode">{displayLookupStatus}</p>
+                </section>
               ) : (
                 <>
                   <section className="lookup-panel capture-floating-panel">
@@ -633,7 +665,7 @@ function App() {
                       type="button"
                       data-focusable
                       onClick={() => {
-                        void handleImageLookup({ keepScreen: true, captureRequest: true })
+                        void handleDisplayCapture()
                       }}
                       disabled={isBusy}
                     >
