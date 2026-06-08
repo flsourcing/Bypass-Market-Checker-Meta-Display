@@ -37,6 +37,7 @@ export type ImageLookup = {
   captureCode: string
   captureUrl: string
   provider: string
+  captureMode: 'stream_pair' | 'capture'
   status: 'pending' | 'processing' | 'complete' | 'error'
   result: LookupResult | null
   error: string | null
@@ -165,11 +166,14 @@ export async function deleteApiKey(token: string, provider: string) {
   })
 }
 
-export async function createImageLookup(token: string) {
+export async function createImageLookup(
+  token: string,
+  mode: 'stream_pair' | 'capture' = 'capture',
+) {
   return apiRequest<{ lookup: ImageLookup }>('/lookups', {
     method: 'POST',
     token,
-    body: { provider: 'gemini' },
+    body: { provider: 'gemini', mode },
   })
 }
 

@@ -451,7 +451,10 @@ function App() {
     }
 
     try {
-      const { lookup: createdLookup } = await createImageLookup(token)
+      const lookupMode = isDisplayApp && options?.startStreamOnly
+        ? 'stream_pair'
+        : 'capture'
+      const { lookup: createdLookup } = await createImageLookup(token, lookupMode)
       setLookup(createdLookup)
       if (isDisplayApp && options?.startStreamOnly) {
         setStreamPairLookupId(createdLookup.id)
