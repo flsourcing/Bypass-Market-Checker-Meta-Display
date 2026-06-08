@@ -7,6 +7,7 @@ import {
   createDevicePairing,
   createImageLookup,
   deleteApiKey,
+  fetchLookupImageBlob,
   getApiKeys,
   getDevicePairing,
   getImageLookup,
@@ -39,6 +40,7 @@ function App() {
   const [provider, setProvider] = useState('gemini')
   const [apiKey, setApiKey] = useState('')
   const [lookup, setLookup] = useState<ImageLookup | null>(null)
+  const [lookupImageObjectUrl, setLookupImageObjectUrl] = useState<string | null>(null)
   const [streamPairLookupId, setStreamPairLookupId] = useState<string | null>(null)
   const [displayCaptureArmed, setDisplayCaptureArmed] = useState(false)
   const [devicePairing, setDevicePairing] = useState<DevicePairing | null>(null)
@@ -159,10 +161,99 @@ function App() {
         .catch((error: unknown) => {
           setMessage(error instanceof Error ? error.message : 'Unable to check lookup status')
         })
-    }, 3000)
+    }, isDisplayApp ? 1200 : 3000)
 
     return () => window.clearInterval(interval)
-  }, [lookup, token])
+  }, [isDisplayApp, lookup, token])
+
+  useEffect(() => {
+    if (!token || !lookup?.imageUrl || lookup.status !== 'complete') {
+      setLookupImageObjectUrl(null)
+      return
+    }
+
+    let cancelled = false
+    let objectUrl: string | null = null
+
+    fetchLookupImageBlob(token, lookup.imageUrl)
+      .then((blob) => {
+        if (cancelled) {
+          return
+        }
+
+        objectUrl = URL.createObjectURL(blob)
+        setLookupImageObjectUrl(objectUrl)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLookupImageObjectUrl(null)
+        }
+      })
+
+    return () => {
+      cancelled = true
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl)
+      }
+    }
+  }, [lookup?.id, lookup?.imageUrl, lookup?.status, token])
+
+  function resetDisplayLookup() {
+    setLookup(null)
+    setLookupImageObjectUrl(null)
+    setStreamPairLookupId(null)
+    setDisplayCaptureArmed(false)
+    setMessage('')
+  }
+
+  function formatLookupDate(value: string) {
+    return new Date(value).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  }
+
+  function lookupProductName(currentLookup: ImageLookup) {
+    return [currentLookup.result?.brand, currentLookup.result?.model]
+      .filter(Boolean)
+      .join(' ') || 'Unknown product'
+  }
+
+  function renderLookupDetailCard(currentLookup: ImageLookup, className = 'lookup-detail-card') {
+    return (
+      <section className={`glass-card ${className}`} aria-label="Lookup Result">
+        {lookupImageObjectUrl && (
+          <img
+            className="captured-preview"
+            src={lookupImageObjectUrl}
+            alt="Captured product"
+          />
+        )}
+
+        <div className="lookup-detail-grid">
+          <div className="lookup-detail-row">
+            <span>Product</span>
+            <strong>{lookupProductName(currentLookup)}</strong>
+          </div>
+          <div className="lookup-detail-row">
+            <span>SKU</span>
+            <strong>{currentLookup.result?.sku ?? 'Not found'}</strong>
+          </div>
+          <div className="lookup-detail-row">
+            <span>Accuracy</span>
+            <strong>{currentLookup.result?.confidence ?? 0}%</strong>
+          </div>
+          <div className="lookup-detail-row">
+            <span>Date</span>
+            <strong>{formatLookupDate(currentLookup.updatedAt || currentLookup.createdAt)}</strong>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -335,6 +426,7 @@ function App() {
     setApiKeys([])
     setPairedDevices([])
     setLookup(null)
+    setLookupImageObjectUrl(null)
     setStreamPairLookupId(null)
     setDisplayCaptureArmed(false)
     setDevicePairing(null)
@@ -502,33 +594,54 @@ function App() {
           <div className="user-chip">{user?.email}</div>
           {isDisplayApp && displayCaptureArmed ? (
             <>
-              <section className="lookup-panel capture-floating-panel">
-                <button
-                  className="lookup-button"
-                  type="button"
-                  data-focusable
-                  onClick={() => {
-                    void handleImageLookup({ keepScreen: true, captureRequest: true })
-                  }}
-                  disabled={isBusy}
-                >
-                  Capture
-                </button>
-              </section>
-              {lookup?.status === 'complete' && (
-                <section className="glass-card result-box home-result" aria-label="Lookup Result">
-                  <p>SKU</p>
-                  <strong>{lookup.result?.sku ?? 'Not found'}</strong>
-                  <span>
-                    {[lookup.result?.brand, lookup.result?.model]
-                      .filter(Boolean)
-                      .join(' ') || 'Unknown product'}
-                  </span>
-                  <small>{lookup.result?.confidence ?? 0}% accurate</small>
-                </section>
-              )}
-              {lookup?.status !== 'complete' && (
-                <p className="center-message capture-mode">{displayLookupStatus}</p>
+              {lookup?.status === 'complete' ? (
+                <>
+                  {renderLookupDetailCard(lookup, 'lookup-detail-card home-result')}
+                  <section className="lookup-panel capture-floating-panel">
+                    <button
+                      className="lookup-button"
+                      type="button"
+                      data-focusable
+                      onClick={resetDisplayLookup}
+                    >
+                      New Lookup
+                    </button>
+                  </section>
+                </>
+              ) : lookup?.status === 'error' ? (
+                <>
+                  <section className="glass-card result-box home-result" aria-label="Lookup Error">
+                    <p>Lookup Failed</p>
+                    <span>{lookup.error ?? 'Lookup failed'}</span>
+                  </section>
+                  <section className="lookup-panel capture-floating-panel">
+                    <button
+                      className="lookup-button"
+                      type="button"
+                      data-focusable
+                      onClick={resetDisplayLookup}
+                    >
+                      Try Again
+                    </button>
+                  </section>
+                </>
+              ) : (
+                <>
+                  <section className="lookup-panel capture-floating-panel">
+                    <button
+                      className="lookup-button"
+                      type="button"
+                      data-focusable
+                      onClick={() => {
+                        void handleImageLookup({ keepScreen: true, captureRequest: true })
+                      }}
+                      disabled={isBusy}
+                    >
+                      Capture
+                    </button>
+                  </section>
+                  <p className="center-message capture-mode">{displayLookupStatus}</p>
+                </>
               )}
             </>
           ) : (
@@ -714,19 +827,7 @@ function App() {
             </div>
           )}
 
-          {lookup?.status === 'complete' && (
-            <div className="result-box">
-              <p>SKU</p>
-              <strong>{lookup.result?.sku ?? 'Not found'}</strong>
-              <span>
-                {[lookup.result?.brand, lookup.result?.model, lookup.result?.colorway]
-                  .filter(Boolean)
-                  .join(' • ') || 'No product details returned'}
-              </span>
-              <small>Confidence: {lookup.result?.confidence ?? 0}%</small>
-              {lookup.result?.notes && <small>{lookup.result.notes}</small>}
-            </div>
-          )}
+          {lookup?.status === 'complete' && renderLookupDetailCard(lookup)}
 
           {lookup?.status === 'error' && (
             <p className="status-message">{lookup.error ?? 'Lookup failed'}</p>

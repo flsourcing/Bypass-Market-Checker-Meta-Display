@@ -1,6 +1,10 @@
 const API_BASE_URL = import.meta.env.VITE_META_CLOUD_API_URL ?? 'http://localhost:8080'
 const TOKEN_STORAGE_KEY = 'bypass-market-session-token'
 
+export function getApiBaseUrl() {
+  return API_BASE_URL
+}
+
 export type User = {
   id: string
   email: string
@@ -36,6 +40,7 @@ export type ImageLookup = {
   status: 'pending' | 'processing' | 'complete' | 'error'
   result: LookupResult | null
   error: string | null
+  imageUrl: string | null
   createdAt: string
   updatedAt: string
 }
@@ -171,6 +176,20 @@ export async function getImageLookup(token: string, lookupId: string) {
   return apiRequest<{ lookup: ImageLookup }>(`/lookups/${encodeURIComponent(lookupId)}`, {
     token,
   })
+}
+
+export async function fetchLookupImageBlob(token: string, imageUrl: string) {
+  const response = await fetch(imageUrl, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error('Could not load lookup image')
+  }
+
+  return response.blob()
 }
 
 export async function uploadLookupImage(captureCode: string, image: Blob) {
