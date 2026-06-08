@@ -7,22 +7,38 @@ import {
   createDevicePairing,
   createBarcodeLookup,
   createImageLookup,
+  deleteAliasIntegration,
   deleteApiKey,
+  deleteStockXIntegration,
   fetchLookupImageBlob,
+  formatMarketPrice,
+  getAliasIntegration,
+  getApiBaseUrl,
   getApiKeys,
   getDevicePairing,
   getImageLookup,
   getMe,
   getPairedDevices,
+  getStockXIntegration,
   getStoredToken,
   login,
   removePairedDevice,
   register,
   revealApiKey,
+  saveAliasIntegration,
   saveApiKey,
+  saveStockXIntegration,
   setStoredToken,
+  startStockXOAuth,
 } from './api'
-import type { ApiKeyRecord, DevicePairing, ImageLookup, PairedDevice, User } from './api'
+import type {
+  ApiKeyRecord,
+  DevicePairing,
+  ImageLookup,
+  IntegrationStatus,
+  PairedDevice,
+  User,
+} from './api'
 
 type Screen = 'auth' | 'home' | 'settings' | 'lookup'
 type AuthMode = 'login' | 'register'
@@ -51,6 +67,15 @@ function App() {
   const [message, setMessage] = useState('')
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
+  const [aliasIntegration, setAliasIntegration] = useState<IntegrationStatus | null>(null)
+  const [stockxIntegration, setStockxIntegration] = useState<IntegrationStatus | null>(null)
+  const [aliasEmail, setAliasEmail] = useState('')
+  const [aliasPassword, setAliasPassword] = useState('')
+  const [aliasApiKey, setAliasApiKey] = useState('')
+  const [stockxEmail, setStockxEmail] = useState('')
+  const [stockxApiKey, setStockxApiKey] = useState('')
+  const [stockxClientId, setStockxClientId] = useState('')
+  const [stockxClientSecret, setStockxClientSecret] = useState('')
 
   useEffect(() => {
     if (
@@ -181,6 +206,40 @@ function App() {
   }, [devicePairing, isDisplayApp])
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const oauthResult = params.get('stockx_oauth')
+
+    if (!oauthResult) {
+      return
+    }
+
+    if (oauthResult === 'success') {
+      setMessage('StockX login connected.')
+      setScreen('settings')
+      if (token) {
+        void refreshIntegrations(token)
+      }
+    } else {
+      setMessage(params.get('message') ?? 'StockX login failed.')
+      setScreen('settings')
+    }
+
+    params.delete('stockx_oauth')
+    params.delete('message')
+    const nextSearch = params.toString()
+    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}`
+    window.history.replaceState({}, '', nextUrl)
+  }, [token])
+
+  useEffect(() => {
+    if (!token || screen !== 'settings') {
+      return
+    }
+
+    void refreshIntegrations(token)
+  }, [screen, token])
+
+  useEffect(() => {
     if (!token || !lookup) {
       return
     }
@@ -188,11 +247,14 @@ function App() {
     const waitingForImage = lookup.status === 'complete'
       && !lookup.imagePreview
       && !lookupImageObjectUrl
+    const waitingForMarket = lookup.status === 'complete'
+      && lookup.marketStatus === 'loading'
 
     if (
       lookup.status !== 'pending'
       && lookup.status !== 'processing'
       && !waitingForImage
+      && !waitingForMarket
     ) {
       return
     }
@@ -213,7 +275,7 @@ function App() {
         .catch((error: unknown) => {
           setMessage(error instanceof Error ? error.message : 'Unable to check lookup status')
         })
-    }, isDisplayApp && (captureSessionActive || waitingForImage) ? 800 : isDisplayApp ? 1200 : 3000)
+    }, isDisplayApp && (captureSessionActive || waitingForImage || waitingForMarket) ? 800 : isDisplayApp ? 1200 : 3000)
 
     return () => window.clearInterval(interval)
   }, [captureSessionActive, isDisplayApp, lookup, lookupImageObjectUrl, streamPairLookupId, token])
@@ -321,6 +383,11 @@ function App() {
     const imageSrc = lookupImageSrc(currentLookup)
     const isBarcode = currentLookup.lookupType === 'barcode'
     const upc = currentLookup.result?.upc ?? currentLookup.result?.sku
+    const marketData = currentLookup.marketData
+    const aliasImage = marketData?.alias?.product.mainPictureUrl ?? null
+    const productTitle = marketData?.stockx?.product.title
+      ?? marketData?.alias?.product.name
+      ?? lookupProductName(currentLookup)
 
     return (
       <section
@@ -361,20 +428,89 @@ function App() {
               </div>
             </>
           )}
+          {productTitle && marketData && (
+            <div className="lookup-detail-row">
+              <span>Market Match</span>
+              <strong>{productTitle}</strong>
+            </div>
+          )}
           <div className="lookup-detail-row">
             <span>Date</span>
             <strong>{formatLookupDate(currentLookup.updatedAt || currentLookup.createdAt)}</strong>
           </div>
         </div>
 
-        {imageSrc ? (
-          <img
-            className="captured-preview captured-preview-below"
-            src={imageSrc}
-            alt={isBarcode ? 'Captured barcode' : 'Captured product'}
-          />
-        ) : (
+        {(imageSrc || aliasImage) && (
+          <div className="product-image-compare">
+            {imageSrc && (
+              <div className="product-image-card">
+                <span>Your Photo</span>
+                <img
+                  className="captured-preview captured-preview-below"
+                  src={imageSrc}
+                  alt={isBarcode ? 'Captured barcode' : 'Captured product'}
+                />
+              </div>
+            )}
+            {aliasImage && (
+              <div className="product-image-card">
+                <span>Alias Catalog</span>
+                <img
+                  className="captured-preview captured-preview-below"
+                  src={aliasImage}
+                  alt="Alias catalog product"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {!imageSrc && !aliasImage && (
           <p className="image-loading-note">Loading captured photo...</p>
+        )}
+
+        {currentLookup.marketStatus === 'loading' && (
+          <p className="market-loading-note">Loading StockX and Alias market data...</p>
+        )}
+
+        {marketData && marketData.combined.length > 0 && (
+          <div className="market-table-wrap">
+            <p className="add-label">Market Pricing (New)</p>
+            <table className="market-table">
+              <thead>
+                <tr>
+                  <th>Size</th>
+                  <th colSpan={2}>StockX</th>
+                  <th colSpan={2}>Alias</th>
+                </tr>
+                <tr className="market-table-subhead">
+                  <th />
+                  <th>Bid</th>
+                  <th>Ask</th>
+                  <th>Bid</th>
+                  <th>Ask</th>
+                </tr>
+              </thead>
+              <tbody>
+                {marketData.combined.map((row) => (
+                  <tr key={row.size}>
+                    <td>{formatSize(row.size)}</td>
+                    <td>{formatMarketPrice(row.stockx?.highestBid)}</td>
+                    <td>{formatMarketPrice(row.stockx?.lowestAsk)}</td>
+                    <td>{formatMarketPrice(row.alias?.highestBid)}</td>
+                    <td>{formatMarketPrice(row.alias?.lowestAsk)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {marketData && (marketData.errors.alias || marketData.errors.stockx) && (
+          <div className="market-errors">
+            {marketData.errors.stockx && <p>StockX: {marketData.errors.stockx}</p>}
+            {marketData.errors.alias && <p>Alias: {marketData.errors.alias}</p>}
+          </div>
         )}
       </section>
     )
@@ -418,6 +554,133 @@ function App() {
 
     const { devices } = await getPairedDevices(activeToken)
     setPairedDevices(devices)
+  }
+
+  async function refreshIntegrations(activeToken = token) {
+    if (!activeToken) {
+      return
+    }
+
+    const [aliasResult, stockxResult] = await Promise.all([
+      getAliasIntegration(activeToken),
+      getStockXIntegration(activeToken),
+    ])
+
+    setAliasIntegration(aliasResult.integration)
+    setStockxIntegration(stockxResult.integration)
+  }
+
+  async function handleSaveAliasIntegration(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!token) {
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      const result = await saveAliasIntegration(token, {
+        email: aliasEmail,
+        password: aliasPassword,
+        apiKey: aliasApiKey,
+      })
+      setAliasIntegration(result.integration)
+      setAliasPassword('')
+      setAliasApiKey('')
+      setMessage('Alias credentials saved.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not save Alias credentials')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleSaveStockXIntegration(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!token) {
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      const result = await saveStockXIntegration(token, {
+        email: stockxEmail,
+        apiKey: stockxApiKey,
+        clientId: stockxClientId,
+        clientSecret: stockxClientSecret,
+      })
+      setStockxIntegration(result.integration)
+      setStockxClientSecret('')
+      setMessage('StockX credentials saved.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not save StockX credentials')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleStockXLogin() {
+    if (!token) {
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      const result = await startStockXOAuth(token)
+      window.location.href = result.authUrl
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not start StockX login')
+      setIsBusy(false)
+    }
+  }
+
+  async function handleDeleteAliasIntegration() {
+    if (!token) {
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await deleteAliasIntegration(token)
+      setAliasIntegration(null)
+      setMessage('Alias credentials removed.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not remove Alias credentials')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleDeleteStockXIntegration() {
+    if (!token) {
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      await deleteStockXIntegration(token)
+      setStockxIntegration(null)
+      setMessage('StockX credentials removed.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not remove StockX credentials')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  function formatSize(size: number) {
+    return Number.isInteger(size) ? String(size) : size.toFixed(1)
   }
 
   async function handleSaveApiKey(event: FormEvent<HTMLFormElement>) {
@@ -858,8 +1121,8 @@ function App() {
           </div>
 
           <div className="key-list">
-            {apiKeys.length === 0 && <p>No API keys saved.</p>}
-            {apiKeys.map((record) => (
+            {apiKeys.filter((record) => record.provider === 'gemini').length === 0 && <p>No API keys saved.</p>}
+            {apiKeys.filter((record) => record.provider === 'gemini').map((record) => (
               <div className="key-row" key={record.id}>
                 <div className="key-info">
                   <span>{record.provider}</span>
@@ -923,6 +1186,138 @@ function App() {
               Save API Key
             </button>
           </form>
+
+          <div className="integration-section">
+            <div className="add-label">Alias (GOAT)</div>
+            {aliasIntegration?.configured && (
+              <p className="integration-status">
+                Connected as {aliasIntegration.email ?? 'saved account'}
+              </p>
+            )}
+            <form className="stack-form" onSubmit={handleSaveAliasIntegration}>
+              <input
+                data-focusable
+                type="email"
+                placeholder="Alias email"
+                value={aliasEmail}
+                onChange={(event) => setAliasEmail(event.target.value)}
+              />
+              <input
+                data-focusable
+                type="password"
+                placeholder="Alias password"
+                value={aliasPassword}
+                onChange={(event) => setAliasPassword(event.target.value)}
+              />
+              <input
+                data-focusable
+                type="password"
+                placeholder="Alias API key (authorization token)"
+                value={aliasApiKey}
+                onChange={(event) => setAliasApiKey(event.target.value)}
+              />
+              <button
+                className="primary-button"
+                type="submit"
+                data-focusable
+                disabled={isBusy || !aliasEmail.trim() || !aliasPassword.trim() || !aliasApiKey.trim()}
+              >
+                Save Alias
+              </button>
+            </form>
+            {aliasIntegration?.configured && (
+              <button
+                className="text-button danger"
+                type="button"
+                data-focusable
+                disabled={isBusy}
+                onClick={() => void handleDeleteAliasIntegration()}
+              >
+                Remove Alias
+              </button>
+            )}
+          </div>
+
+          <div className="integration-section">
+            <div className="add-label">StockX</div>
+            {stockxIntegration?.configured && (
+              <p className="integration-status">
+                {stockxIntegration.email ?? 'Saved account'}
+                {stockxIntegration.oauthConnected ? ' · OAuth connected' : ' · Login required'}
+              </p>
+            )}
+            <form className="stack-form" onSubmit={handleSaveStockXIntegration}>
+              <input
+                data-focusable
+                type="email"
+                placeholder="StockX account email"
+                value={stockxEmail}
+                onChange={(event) => setStockxEmail(event.target.value)}
+              />
+              <input
+                data-focusable
+                type="password"
+                placeholder="StockX x-api-key"
+                value={stockxApiKey}
+                onChange={(event) => setStockxApiKey(event.target.value)}
+              />
+              <input
+                data-focusable
+                type="text"
+                placeholder="Client ID"
+                value={stockxClientId}
+                onChange={(event) => setStockxClientId(event.target.value)}
+              />
+              <input
+                data-focusable
+                type="password"
+                placeholder="Client secret"
+                value={stockxClientSecret}
+                onChange={(event) => setStockxClientSecret(event.target.value)}
+              />
+              <button
+                className="primary-button"
+                type="submit"
+                data-focusable
+                disabled={
+                  isBusy
+                  || !stockxEmail.trim()
+                  || !stockxApiKey.trim()
+                  || !stockxClientId.trim()
+                  || !stockxClientSecret.trim()
+                }
+              >
+                Save StockX
+              </button>
+            </form>
+            {stockxIntegration?.configured && (
+              <>
+                <button
+                  className="primary-button ready-button"
+                  type="button"
+                  data-focusable
+                  disabled={isBusy}
+                  onClick={() => void handleStockXLogin()}
+                >
+                  Login to StockX
+                </button>
+                <p className="integration-note">
+                  Register callback URL in StockX Developer Portal:
+                  {' '}
+                  {stockxIntegration.redirectUri ?? `${getApiBaseUrl()}/integrations/stockx/oauth/callback`}
+                </p>
+                <button
+                  className="text-button danger"
+                  type="button"
+                  data-focusable
+                  disabled={isBusy}
+                  onClick={() => void handleDeleteStockXIntegration()}
+                >
+                  Remove StockX
+                </button>
+              </>
+            )}
+          </div>
 
           <div className="paired-devices">
             <div className="add-label">Devices</div>

@@ -573,6 +573,96 @@ select {
   object-fit: contain;
 }
 
+.integration-section {
+  display: grid;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.integration-status,
+.integration-note,
+.market-loading-note {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.integration-note {
+  overflow-wrap: anywhere;
+}
+
+.product-image-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.product-image-card {
+  display: grid;
+  gap: 8px;
+}
+
+.product-image-card span {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.market-table-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.market-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.market-table th,
+.market-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+}
+
+.market-table th:first-child,
+.market-table td:first-child {
+  text-align: left;
+}
+
+.market-table thead th {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.market-table-subhead th {
+  font-size: 10px;
+}
+
+.market-table tbody td {
+  color: #f8fbff;
+  font-weight: 700;
+}
+
+.market-errors {
+  display: grid;
+  gap: 6px;
+  color: #ffb8b8;
+  font-size: 13px;
+}
+
+.market-errors p {
+  margin: 0;
+}
+
 @media (max-width: 480px) {
   .app-shell {
     padding: 20px;

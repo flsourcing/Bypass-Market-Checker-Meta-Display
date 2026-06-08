@@ -33,6 +33,66 @@ export type LookupResult = {
   notes: string | null
 }
 
+export type MarketSizeQuote = {
+  size: number
+  stockx: {
+    lowestAsk: number | null
+    highestBid: number | null
+  } | null
+  alias: {
+    lowestAsk: number | null
+    highestBid: number | null
+  } | null
+}
+
+export type LookupMarketData = {
+  status: 'complete' | 'partial' | 'error'
+  query: string
+  alias: {
+    product: {
+      name: string
+      brand: string
+      sku: string
+      colorway: string | null
+      mainPictureUrl: string | null
+      retailPriceCents: number | null
+    }
+    sizes: Array<{
+      size: number
+      lowestAsk: number | null
+      highestBid: number | null
+    }>
+  } | null
+  stockx: {
+    product: {
+      productId: string
+      title: string
+      brand: string
+      styleId: string | null
+      colorway: string | null
+      urlKey: string | null
+    }
+    sizes: Array<{
+      size: number
+      lowestAsk: number | null
+      highestBid: number | null
+    }>
+  } | null
+  combined: MarketSizeQuote[]
+  errors: {
+    alias?: string
+    stockx?: string
+  }
+}
+
+export type IntegrationStatus = {
+  provider: 'alias' | 'stockx'
+  configured: boolean
+  email: string | null
+  oauthConnected?: boolean
+  redirectUri?: string
+}
+
 export type ImageLookup = {
   id: string
   captureCode: string
@@ -45,6 +105,8 @@ export type ImageLookup = {
   error: string | null
   imageUrl: string | null
   imagePreview: string | null
+  marketStatus: 'loading' | 'complete' | 'partial' | 'error' | null
+  marketData: LookupMarketData | null
   createdAt: string
   updatedAt: string
 }
@@ -252,4 +314,63 @@ export async function removePairedDevice(token: string, deviceId: string) {
     method: 'DELETE',
     token,
   })
+}
+
+export async function getAliasIntegration(token: string) {
+  return apiRequest<{ integration: IntegrationStatus }>('/integrations/alias', { token })
+}
+
+export async function saveAliasIntegration(
+  token: string,
+  payload: { email: string; password: string; apiKey: string },
+) {
+  return apiRequest<{ integration: IntegrationStatus }>('/integrations/alias', {
+    method: 'POST',
+    token,
+    body: payload,
+  })
+}
+
+export async function deleteAliasIntegration(token: string) {
+  return apiRequest<void>('/integrations/alias', {
+    method: 'DELETE',
+    token,
+  })
+}
+
+export async function getStockXIntegration(token: string) {
+  return apiRequest<{ integration: IntegrationStatus }>('/integrations/stockx', { token })
+}
+
+export async function saveStockXIntegration(
+  token: string,
+  payload: { email: string; apiKey: string; clientId: string; clientSecret: string },
+) {
+  return apiRequest<{ integration: IntegrationStatus }>('/integrations/stockx', {
+    method: 'POST',
+    token,
+    body: payload,
+  })
+}
+
+export async function deleteStockXIntegration(token: string) {
+  return apiRequest<void>('/integrations/stockx', {
+    method: 'DELETE',
+    token,
+  })
+}
+
+export async function startStockXOAuth(token: string) {
+  return apiRequest<{ authUrl: string; redirectUri: string }>(
+    '/integrations/stockx/oauth/start',
+    { token },
+  )
+}
+
+export function formatMarketPrice(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value)) {
+    return '—'
+  }
+
+  return `$${value.toFixed(0)}`
 }
