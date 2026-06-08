@@ -53,12 +53,38 @@ function App() {
   const [isBusy, setIsBusy] = useState(false)
 
   useEffect(() => {
+    if (
+      isDisplayApp
+      && displayCaptureArmed
+      && (lookup?.status === 'complete' || lookup?.status === 'error')
+    ) {
+      document.querySelector<HTMLElement>('.lookup-result-scroll')?.focus()
+      return
+    }
+
     const firstFocusable = document.querySelector<HTMLElement>('[data-focusable]')
     firstFocusable?.focus()
-  }, [screen, authMode, lookup?.status])
+  }, [screen, authMode, lookup?.status, isDisplayApp, displayCaptureArmed])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const active = document.activeElement as HTMLElement | null
+      const scrollContainer = active?.matches('[data-scrollable]')
+        ? active
+        : active?.closest<HTMLElement>('[data-scrollable]') ?? null
+
+      if (scrollContainer && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+        event.preventDefault()
+        const delta = event.key === 'ArrowDown' ? 140 : -140
+        const maxScroll = scrollContainer.scrollHeight - scrollContainer.clientHeight
+        const nextTop = Math.max(0, Math.min(maxScroll, scrollContainer.scrollTop + delta))
+
+        if (nextTop !== scrollContainer.scrollTop) {
+          scrollContainer.scrollTop = nextTop
+          return
+        }
+      }
+
       const focusableElements = Array.from(
         document.querySelectorAll<HTMLElement>('[data-focusable]'),
       )
@@ -297,8 +323,15 @@ function App() {
     const upc = currentLookup.result?.upc ?? currentLookup.result?.sku
 
     return (
-      <section className={`glass-card ${className}`} aria-label="Lookup Result">
+      <section
+        className={`glass-card ${className} lookup-result-scroll`}
+        aria-label="Lookup Result"
+        data-focusable
+        data-scrollable
+        tabIndex={0}
+      >
         <p className="eyebrow">Lookup Result</p>
+        {isDisplayApp && <p className="scroll-hint">Use up/down to scroll this result.</p>}
 
         <div className="lookup-detail-grid">
           {isBarcode ? (
@@ -737,9 +770,16 @@ function App() {
               {lookup?.status === 'complete' ? (
                 renderLookupDetailCard(lookup, 'lookup-detail-card home-result')
               ) : lookup?.status === 'error' ? (
-                <section className="glass-card result-box home-result" aria-label="Lookup Error">
+                <section
+                  className="glass-card result-box home-result lookup-result-scroll"
+                  aria-label="Lookup Error"
+                  data-focusable
+                  data-scrollable
+                  tabIndex={0}
+                >
                   <p>Lookup Failed</p>
                   <span>{lookup.error ?? 'Lookup failed'}</span>
+                  {isDisplayApp && <p className="scroll-hint">Use up/down to scroll this result.</p>}
                 </section>
               ) : isDisplayCaptureBusy ? (
                 <section className="glass-card processing-card home-result" aria-label="Processing Capture">
