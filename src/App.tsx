@@ -229,6 +229,16 @@ function App() {
     setMessage('')
   }
 
+  function goDisplayHome() {
+    if (screen === 'settings') {
+      setScreen('home')
+      setMessage('')
+      return
+    }
+
+    resetDisplayLookup()
+  }
+
   async function handleDisplayCapture() {
     if (!token) {
       return
@@ -556,6 +566,18 @@ function App() {
 
   return (
     <main className={`app-shell ${isDisplayApp ? 'display-app-shell' : ''}`}>
+      {screen !== 'auth' && isDisplayApp && (
+        <button
+          className="home-button"
+          type="button"
+          aria-label="Home"
+          data-focusable
+          onClick={goDisplayHome}
+        >
+          Home
+        </button>
+      )}
+
       {screen !== 'auth' && (
         <button
           className="settings-button"
@@ -642,36 +664,12 @@ function App() {
           {isDisplayApp && displayCaptureArmed ? (
             <>
               {lookup?.status === 'complete' ? (
-                <>
-                  {renderLookupDetailCard(lookup, 'lookup-detail-card home-result')}
-                  <section className="lookup-panel capture-floating-panel">
-                    <button
-                      className="lookup-button"
-                      type="button"
-                      data-focusable
-                      onClick={resetDisplayLookup}
-                    >
-                      New Lookup
-                    </button>
-                  </section>
-                </>
+                renderLookupDetailCard(lookup, 'lookup-detail-card home-result')
               ) : lookup?.status === 'error' ? (
-                <>
-                  <section className="glass-card result-box home-result" aria-label="Lookup Error">
-                    <p>Lookup Failed</p>
-                    <span>{lookup.error ?? 'Lookup failed'}</span>
-                  </section>
-                  <section className="lookup-panel capture-floating-panel">
-                    <button
-                      className="lookup-button"
-                      type="button"
-                      data-focusable
-                      onClick={resetDisplayLookup}
-                    >
-                      Try Again
-                    </button>
-                  </section>
-                </>
+                <section className="glass-card result-box home-result" aria-label="Lookup Error">
+                  <p>Lookup Failed</p>
+                  <span>{lookup.error ?? 'Lookup failed'}</span>
+                </section>
               ) : isDisplayCaptureBusy ? (
                 <section className="glass-card processing-card home-result" aria-label="Processing Capture">
                   <p className="eyebrow">Image Lookup</p>
