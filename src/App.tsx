@@ -610,7 +610,9 @@ function App() {
         ? 'Live stream pair requested. Tap Capture when ready.'
         : 'Processing Capture...'
       : lookup.status === 'processing'
-        ? 'Processing Capture...'
+        ? lookup.lookupType === 'barcode'
+          ? 'Reading barcode with Gemini...'
+          : 'Processing Capture...'
         : lookup.status === 'complete'
           ? 'Capture complete.'
           : lookup.error ?? 'Lookup failed'
@@ -730,7 +732,11 @@ function App() {
               ) : isDisplayCaptureBusy ? (
                 <section className="glass-card processing-card home-result" aria-label="Processing Capture">
                   <p className="eyebrow">{activeLookupKind === 'barcode' ? 'Barcode Lookup' : 'Image Lookup'}</p>
-                  <h1 className="processing-title">Processing Capture</h1>
+                  <h1 className="processing-title">
+                    {activeLookupKind === 'barcode' && lookup?.status === 'processing'
+                      ? 'Reading Barcode'
+                      : 'Processing Capture'}
+                  </h1>
                   <p className="center-message capture-mode">{displayLookupStatus}</p>
                 </section>
               ) : (
