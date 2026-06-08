@@ -5,6 +5,7 @@ import {
   approveDevicePairing,
   clearStoredToken,
   createDevicePairing,
+  createBarcodeLookup,
   createImageLookup,
   deleteApiKey,
   fetchLookupImageBlob,
@@ -25,6 +26,7 @@ import type { ApiKeyRecord, DevicePairing, ImageLookup, PairedDevice, User } fro
 
 type Screen = 'auth' | 'home' | 'settings' | 'lookup'
 type AuthMode = 'login' | 'register'
+type LookupKind = 'image' | 'barcode'
 
 function App() {
   const isDisplayApp = window.location.pathname.toLowerCase().includes('/display-app')
@@ -42,6 +44,7 @@ function App() {
   const [lookup, setLookup] = useState<ImageLookup | null>(null)
   const [lookupImageObjectUrl, setLookupImageObjectUrl] = useState<string | null>(null)
   const [streamPairLookupId, setStreamPairLookupId] = useState<string | null>(null)
+  const [activeLookupKind, setActiveLookupKind] = useState<LookupKind | null>(null)
   const [displayCaptureArmed, setDisplayCaptureArmed] = useState(false)
   const [captureSessionActive, setCaptureSessionActive] = useState(false)
   const [devicePairing, setDevicePairing] = useState<DevicePairing | null>(null)
@@ -224,6 +227,7 @@ function App() {
     setLookup(null)
     setLookupImageObjectUrl(null)
     setStreamPairLookupId(null)
+    setActiveLookupKind(null)
     setDisplayCaptureArmed(false)
     setCaptureSessionActive(false)
     setMessage('')
@@ -246,6 +250,12 @@ function App() {
 
     setCaptureSessionActive(true)
     setMessage('Processing Capture...')
+
+    if (activeLookupKind === 'barcode') {
+      await handleBarcodeLookup({ keepScreen: true, captureRequest: true })
+      return
+    }
+
     await handleImageLookup({ keepScreen: true, captureRequest: true })
   }
 
@@ -271,24 +281,41 @@ function App() {
 
   function renderLookupDetailCard(currentLookup: ImageLookup, className = 'lookup-detail-card') {
     const imageSrc = lookupImageSrc(currentLookup)
+    const isBarcode = currentLookup.lookupType === 'barcode'
+    const upc = currentLookup.result?.upc ?? currentLookup.result?.sku
 
     return (
       <section className={`glass-card ${className}`} aria-label="Lookup Result">
         <p className="eyebrow">Lookup Result</p>
 
         <div className="lookup-detail-grid">
-          <div className="lookup-detail-row">
-            <span>Product</span>
-            <strong>{lookupProductName(currentLookup)}</strong>
-          </div>
-          <div className="lookup-detail-row">
-            <span>SKU</span>
-            <strong>{currentLookup.result?.sku ?? 'Not found'}</strong>
-          </div>
-          <div className="lookup-detail-row">
-            <span>Accuracy</span>
-            <strong>{currentLookup.result?.confidence ?? 0}%</strong>
-          </div>
+          {isBarcode ? (
+            <>
+              <div className="lookup-detail-row">
+                <span>UPC</span>
+                <strong>{upc ?? 'Not found'}</strong>
+              </div>
+              <div className="lookup-detail-row">
+                <span>Format</span>
+                <strong>{currentLookup.result?.notes ?? 'Code 128 barcode'}</strong>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="lookup-detail-row">
+                <span>Product</span>
+                <strong>{lookupProductName(currentLookup)}</strong>
+              </div>
+              <div className="lookup-detail-row">
+                <span>SKU</span>
+                <strong>{currentLookup.result?.sku ?? 'Not found'}</strong>
+              </div>
+              <div className="lookup-detail-row">
+                <span>Accuracy</span>
+                <strong>{currentLookup.result?.confidence ?? 0}%</strong>
+              </div>
+            </>
+          )}
           <div className="lookup-detail-row">
             <span>Date</span>
             <strong>{formatLookupDate(currentLookup.updatedAt || currentLookup.createdAt)}</strong>
@@ -299,7 +326,7 @@ function App() {
           <img
             className="captured-preview captured-preview-below"
             src={imageSrc}
-            alt="Captured product"
+            alt={isBarcode ? 'Captured barcode' : 'Captured product'}
           />
         ) : (
           <p className="image-loading-note">Loading captured photo...</p>
@@ -424,21 +451,34 @@ function App() {
     }
   }
 
-    async function handleImageLookup(options?: { keepScreen?: boolean; captureRequest?: boolean; startStreamOnly?: boolean }) {
+  async function handleLookup(
+    kind: LookupKind,
+    options?: { keepScreen?: boolean; captureRequest?: boolean; startStreamOnly?: boolean },
+  ) {
     if (!token) {
       setScreen('auth')
       return
     }
 
+    if (kind === 'image' && !apiKeys.some((record) => record.provider === 'gemini')) {
+      setMessage('Add a Gemini API key in Settings before image lookup.')
+      return
+    }
+
+    setActiveLookupKind(kind)
     setIsBusy(true)
     setMessage(
       isDisplayApp && options?.captureRequest
         ? 'Processing Capture...'
         : isDisplayApp && options?.startStreamOnly
-          ? 'Starting live stream pair...'
+          ? kind === 'barcode'
+            ? 'Starting barcode stream pair...'
+            : 'Starting live stream pair...'
         : isDisplayApp
           ? 'Waiting for Mobile Stream Pair'
-          : 'Looking Up Product',
+          : kind === 'barcode'
+            ? 'Scanning Barcode'
+            : 'Looking Up Product',
     )
     if (!options?.captureRequest) {
       setLookup(null)
@@ -454,7 +494,8 @@ function App() {
       const lookupMode = isDisplayApp && options?.startStreamOnly
         ? 'stream_pair'
         : 'capture'
-      const { lookup: createdLookup } = await createImageLookup(token, lookupMode)
+      const createLookup = kind === 'barcode' ? createBarcodeLookup : createImageLookup
+      const { lookup: createdLookup } = await createLookup(token, lookupMode)
       setLookup(createdLookup)
       if (isDisplayApp && options?.startStreamOnly) {
         setStreamPairLookupId(createdLookup.id)
@@ -463,16 +504,28 @@ function App() {
         isDisplayApp && options?.captureRequest
           ? 'Processing Capture...'
           : isDisplayApp && options?.startStreamOnly
-            ? 'Live stream pair requested. Companion should auto-start glasses stream.'
+            ? kind === 'barcode'
+              ? 'Barcode stream pair requested. Tap Capture when ready.'
+              : 'Live stream pair requested. Companion should auto-start glasses stream.'
           : isDisplayApp
             ? 'Waiting for Mobile Stream Pair'
-            : 'Looking Up Product',
+            : kind === 'barcode'
+              ? 'Scanning Barcode'
+              : 'Looking Up Product',
       )
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not start image lookup')
+      setMessage(error instanceof Error ? error.message : `Could not start ${kind} lookup`)
     } finally {
       setIsBusy(false)
     }
+  }
+
+  async function handleImageLookup(options?: { keepScreen?: boolean; captureRequest?: boolean; startStreamOnly?: boolean }) {
+    await handleLookup('image', options)
+  }
+
+  async function handleBarcodeLookup(options?: { keepScreen?: boolean; captureRequest?: boolean; startStreamOnly?: boolean }) {
+    await handleLookup('barcode', options)
   }
 
   function handleLogout() {
@@ -484,6 +537,7 @@ function App() {
     setLookup(null)
     setLookupImageObjectUrl(null)
     setStreamPairLookupId(null)
+    setActiveLookupKind(null)
     setDisplayCaptureArmed(false)
     setCaptureSessionActive(false)
     setDevicePairing(null)
@@ -675,7 +729,7 @@ function App() {
                 </section>
               ) : isDisplayCaptureBusy ? (
                 <section className="glass-card processing-card home-result" aria-label="Processing Capture">
-                  <p className="eyebrow">Image Lookup</p>
+                  <p className="eyebrow">{activeLookupKind === 'barcode' ? 'Barcode Lookup' : 'Image Lookup'}</p>
                   <h1 className="processing-title">Processing Capture</h1>
                   <p className="center-message capture-mode">{displayLookupStatus}</p>
                 </section>
@@ -717,7 +771,10 @@ function App() {
                   className="lookup-button"
                   type="button"
                   data-focusable
-                  onClick={() => setMessage('Barcode Lookup is next.')}
+                  onClick={() => {
+                    void handleBarcodeLookup(isDisplayApp ? { keepScreen: true, startStreamOnly: true } : undefined)
+                  }}
+                  disabled={isBusy}
                 >
                   Barcode Lookup
                 </button>

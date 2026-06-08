@@ -25,6 +25,7 @@ export type ApiKeyRecord = {
 
 export type LookupResult = {
   sku: string | null
+  upc: string | null
   brand: string | null
   model: string | null
   colorway: string | null
@@ -37,6 +38,7 @@ export type ImageLookup = {
   captureCode: string
   captureUrl: string
   provider: string
+  lookupType: 'image' | 'barcode'
   captureMode: 'stream_pair' | 'capture'
   status: 'pending' | 'processing' | 'complete' | 'error'
   result: LookupResult | null
@@ -173,7 +175,18 @@ export async function createImageLookup(
   return apiRequest<{ lookup: ImageLookup }>('/lookups', {
     method: 'POST',
     token,
-    body: { provider: 'gemini', mode },
+    body: { provider: 'gemini', mode, type: 'image' },
+  })
+}
+
+export async function createBarcodeLookup(
+  token: string,
+  mode: 'stream_pair' | 'capture' = 'capture',
+) {
+  return apiRequest<{ lookup: ImageLookup }>('/lookups', {
+    method: 'POST',
+    token,
+    body: { provider: 'local', mode, type: 'barcode' },
   })
 }
 
