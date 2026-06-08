@@ -275,7 +275,7 @@ function App() {
           if (
             isDisplayApp
             && captureSessionActive
-            && (latestLookup.status === 'processing' || latestLookup.status === 'complete' || latestLookup.status === 'error')
+            && (latestLookup.status === 'complete' || latestLookup.status === 'error')
           ) {
             setCaptureSessionActive(false)
           }
@@ -283,7 +283,7 @@ function App() {
         .catch((error: unknown) => {
           setMessage(error instanceof Error ? error.message : 'Unable to check lookup status')
         })
-    }, isDisplayApp && (captureSessionActive || waitingForImage || waitingForMarket) ? 800 : isDisplayApp ? 1200 : 3000)
+    }, isDisplayApp && (captureSessionActive || lookup.status === 'processing' || waitingForImage || waitingForMarket) ? 500 : isDisplayApp ? 1200 : 3000)
 
     return () => window.clearInterval(interval)
   }, [captureSessionActive, isDisplayApp, lookup, lookupImageObjectUrl, streamPairLookupId, token])
@@ -356,7 +356,7 @@ function App() {
     }
 
     setCaptureSessionActive(true)
-    setMessage('Taking photo...')
+    setMessage('Processing Capture...')
 
     let pendingLookup = lookup?.status === 'pending' ? lookup : null
 
@@ -380,7 +380,7 @@ function App() {
       setLookup(armedLookup)
       setStreamPairLookupId(null)
       setDisplayCaptureArmed(true)
-      setMessage('Taking photo...')
+      setMessage('Processing Capture...')
     } catch (error) {
       setCaptureSessionActive(false)
       setMessage(error instanceof Error ? error.message : 'Could not start capture')
@@ -977,7 +977,7 @@ function App() {
     : lookup.status === 'pending'
       ? awaitingCaptureTap
         ? 'Ready. Tap Capture to snap a photo.'
-        : 'Taking photo...'
+        : 'Snapping photo...'
       : lookup.status === 'processing'
         ? lookup.lookupType === 'barcode'
           ? 'Reading barcode...'
@@ -985,9 +985,9 @@ function App() {
         : lookup.status === 'complete'
           ? 'Capture complete.'
           : lookup.error ?? 'Lookup failed'
-  const isDisplayCaptureBusy = lookup?.status === 'processing'
+  const isDisplayCaptureBusy = captureSessionActive
+    || lookup?.status === 'processing'
     || (lookup?.status === 'pending' && lookup.captureMode === 'capture')
-    || (captureSessionActive && !awaitingCaptureTap)
   const qrCodeUrl = lookup
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(lookup.captureUrl)}`
     : ''
@@ -1109,9 +1109,11 @@ function App() {
                 <section className="glass-card processing-card home-result" aria-label="Processing Capture">
                   <p className="eyebrow">{activeLookupKind === 'barcode' ? 'Barcode Lookup' : 'Image Lookup'}</p>
                   <h1 className="processing-title">
-                    {activeLookupKind === 'barcode' && lookup?.status === 'processing'
+                    {lookup?.status === 'processing' && activeLookupKind === 'barcode'
                       ? 'Reading Barcode'
-                      : 'Processing Capture'}
+                      : lookup?.status === 'processing'
+                        ? 'Identifying Product'
+                        : 'Processing Capture'}
                   </h1>
                   <p className="center-message capture-mode">{displayLookupStatus}</p>
                 </section>
