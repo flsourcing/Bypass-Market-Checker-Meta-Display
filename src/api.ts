@@ -275,12 +275,12 @@ export async function submitLookupFeedback(
   token: string,
   lookupId: string,
   status: 'correct' | 'incorrect',
-  correction?: string,
+  note?: string,
 ) {
   return apiRequest<{ lookup: ImageLookup }>(`/lookups/${encodeURIComponent(lookupId)}/feedback`, {
     method: 'POST',
     token,
-    body: { status, correction },
+    body: { status, note, correction: note },
   })
 }
 

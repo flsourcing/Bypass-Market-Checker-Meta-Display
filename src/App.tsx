@@ -68,7 +68,7 @@ function App() {
   const [devicePairing, setDevicePairing] = useState<DevicePairing | null>(null)
   const [message, setMessage] = useState('')
   const [feedbackLookup, setFeedbackLookup] = useState<ImageLookup | null>(null)
-  const [feedbackCorrection, setFeedbackCorrection] = useState('')
+  const [feedbackNote, setFeedbackNote] = useState('')
   const [showConfetti, setShowConfetti] = useState(false)
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
@@ -439,7 +439,7 @@ function App() {
   async function saveLookupFeedback(
     currentLookup: ImageLookup,
     status: 'correct' | 'incorrect',
-    correction = '',
+    note = '',
   ) {
     if (!token) {
       setMessage('Log in before saving feedback.')
@@ -451,11 +451,11 @@ function App() {
         token,
         currentLookup.id,
         status,
-        correction,
+        note,
       )
       setLookup(updatedLookup)
       setFeedbackLookup(null)
-      setFeedbackCorrection('')
+      setFeedbackNote('')
       setMessage(status === 'correct' ? 'Marked correct.' : 'Marked incorrect. Thanks for helping improve results.')
       if (status === 'correct') {
         triggerConfetti()
@@ -466,8 +466,12 @@ function App() {
   }
 
   function openIncorrectFeedback(currentLookup: ImageLookup) {
+    if (currentLookup.feedback) {
+      setMessage('Feedback has already been saved for this lookup.')
+      return
+    }
     setFeedbackLookup(currentLookup)
-    setFeedbackCorrection('')
+    setFeedbackNote('')
   }
 
   function renderLookupDetailCard(currentLookup: ImageLookup, className = 'lookup-detail-card') {
@@ -540,6 +544,7 @@ function App() {
             className={`feedback-button correct ${currentLookup.feedback?.status === 'correct' ? 'active' : ''}`}
             type="button"
             data-focusable
+            disabled={Boolean(currentLookup.feedback)}
             onClick={() => void saveLookupFeedback(currentLookup, 'correct')}
           >
             Correct
@@ -548,6 +553,7 @@ function App() {
             className={`feedback-button incorrect ${currentLookup.feedback?.status === 'incorrect' ? 'active' : ''}`}
             type="button"
             data-focusable
+            disabled={Boolean(currentLookup.feedback)}
             onClick={() => openIncorrectFeedback(currentLookup)}
           >
             Incorrect
@@ -1575,26 +1581,23 @@ function App() {
             <p className="eyebrow">Incorrect Result</p>
             <h2>Help improve future matches</h2>
             <p>
-              Optional: enter the correct
-              {' '}
-              {feedbackLookup.lookupType === 'barcode' ? 'UPC number' : 'SKU'}
-              . This helps our systems get better over time.
+              Optional: tell us what was wrong with the result. Notes help our systems get better over time.
             </p>
             <input
               data-focusable
               autoFocus
               type="text"
-              inputMode={feedbackLookup.lookupType === 'barcode' ? 'numeric' : 'text'}
-              placeholder={feedbackLookup.lookupType === 'barcode' ? 'Correct UPC (optional)' : 'Correct SKU (optional)'}
-              value={feedbackCorrection}
-              onChange={(event) => setFeedbackCorrection(event.target.value)}
+              inputMode="text"
+              placeholder="Optional note"
+              value={feedbackNote}
+              onChange={(event) => setFeedbackNote(event.target.value)}
             />
             <div className="feedback-modal-actions">
               <button
                 className="primary-button"
                 type="button"
                 data-focusable
-                onClick={() => void saveLookupFeedback(feedbackLookup, 'incorrect', feedbackCorrection)}
+                onClick={() => void saveLookupFeedback(feedbackLookup, 'incorrect', feedbackNote)}
               >
                 Save Incorrect
               </button>
@@ -1604,7 +1607,7 @@ function App() {
                 data-focusable
                 onClick={() => {
                   setFeedbackLookup(null)
-                  setFeedbackCorrection('')
+                  setFeedbackNote('')
                 }}
               >
                 Cancel

@@ -146,6 +146,11 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.feedback-button:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
 .feedback-button.correct.active,
 .feedback-button.correct:hover {
   border-color: rgba(65, 255, 155, 0.7);
