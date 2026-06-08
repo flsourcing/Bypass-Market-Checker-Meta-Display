@@ -107,6 +107,12 @@ export type ImageLookup = {
   imagePreview: string | null
   marketStatus: 'loading' | 'complete' | 'partial' | 'error' | null
   marketData: LookupMarketData | null
+  feedback: {
+    status: 'correct' | 'incorrect'
+    correction: string | null
+    createdAt: string | null
+    updatedAt: string | null
+  } | null
   createdAt: string
   updatedAt: string
 }
@@ -262,6 +268,19 @@ export async function armLookupCapture(token: string, lookupId: string) {
 export async function getImageLookup(token: string, lookupId: string) {
   return apiRequest<{ lookup: ImageLookup }>(`/lookups/${encodeURIComponent(lookupId)}`, {
     token,
+  })
+}
+
+export async function submitLookupFeedback(
+  token: string,
+  lookupId: string,
+  status: 'correct' | 'incorrect',
+  correction?: string,
+) {
+  return apiRequest<{ lookup: ImageLookup }>(`/lookups/${encodeURIComponent(lookupId)}/feedback`, {
+    method: 'POST',
+    token,
+    body: { status, correction },
   })
 }
 

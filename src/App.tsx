@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { CSSProperties, FormEvent } from 'react'
 import './App.css'
 import {
   approveDevicePairing,
@@ -31,6 +31,7 @@ import {
   saveStockXIntegration,
   setStoredToken,
   startStockXOAuth,
+  submitLookupFeedback,
 } from './api'
 import type {
   ApiKeyRecord,
@@ -66,6 +67,9 @@ function App() {
   const [captureSessionActive, setCaptureSessionActive] = useState(false)
   const [devicePairing, setDevicePairing] = useState<DevicePairing | null>(null)
   const [message, setMessage] = useState('')
+  const [feedbackLookup, setFeedbackLookup] = useState<ImageLookup | null>(null)
+  const [feedbackCorrection, setFeedbackCorrection] = useState('')
+  const [showConfetti, setShowConfetti] = useState(false)
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
   const [aliasIntegration, setAliasIntegration] = useState<IntegrationStatus | null>(null)
@@ -426,6 +430,46 @@ function App() {
     return 'Device scan'
   }
 
+  function triggerConfetti() {
+    setShowConfetti(false)
+    window.setTimeout(() => setShowConfetti(true), 0)
+    window.setTimeout(() => setShowConfetti(false), 1800)
+  }
+
+  async function saveLookupFeedback(
+    currentLookup: ImageLookup,
+    status: 'correct' | 'incorrect',
+    correction = '',
+  ) {
+    if (!token) {
+      setMessage('Log in before saving feedback.')
+      return
+    }
+
+    try {
+      const { lookup: updatedLookup } = await submitLookupFeedback(
+        token,
+        currentLookup.id,
+        status,
+        correction,
+      )
+      setLookup(updatedLookup)
+      setFeedbackLookup(null)
+      setFeedbackCorrection('')
+      setMessage(status === 'correct' ? 'Marked correct.' : 'Marked incorrect. Thanks for helping improve results.')
+      if (status === 'correct') {
+        triggerConfetti()
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not save feedback')
+    }
+  }
+
+  function openIncorrectFeedback(currentLookup: ImageLookup) {
+    setFeedbackLookup(currentLookup)
+    setFeedbackCorrection('')
+  }
+
   function renderLookupDetailCard(currentLookup: ImageLookup, className = 'lookup-detail-card') {
     const imageSrc = lookupImageSrc(currentLookup)
     const isBarcode = currentLookup.lookupType === 'barcode'
@@ -485,6 +529,29 @@ function App() {
             <span>Date</span>
             <strong>{formatLookupDate(currentLookup.updatedAt || currentLookup.createdAt)}</strong>
           </div>
+          <div className="lookup-detail-row">
+            <span>Feedback</span>
+            <strong>{currentLookup.feedback?.status ?? 'Not marked'}</strong>
+          </div>
+        </div>
+
+        <div className="feedback-actions">
+          <button
+            className={`feedback-button correct ${currentLookup.feedback?.status === 'correct' ? 'active' : ''}`}
+            type="button"
+            data-focusable
+            onClick={() => void saveLookupFeedback(currentLookup, 'correct')}
+          >
+            Correct
+          </button>
+          <button
+            className={`feedback-button incorrect ${currentLookup.feedback?.status === 'incorrect' ? 'active' : ''}`}
+            type="button"
+            data-focusable
+            onClick={() => openIncorrectFeedback(currentLookup)}
+          >
+            Incorrect
+          </button>
         </div>
 
         {(imageSrc || aliasImage) && (
@@ -1500,6 +1567,59 @@ function App() {
             )}
           </div>
         </section>
+      )}
+
+      {feedbackLookup && (
+        <div className="feedback-modal-backdrop" role="dialog" aria-modal="true" aria-label="Incorrect Feedback">
+          <section className="feedback-modal glass-card">
+            <p className="eyebrow">Incorrect Result</p>
+            <h2>Help improve future matches</h2>
+            <p>
+              Optional: enter the correct
+              {' '}
+              {feedbackLookup.lookupType === 'barcode' ? 'UPC number' : 'SKU'}
+              . This helps our systems get better over time.
+            </p>
+            <input
+              data-focusable
+              autoFocus
+              type="text"
+              inputMode={feedbackLookup.lookupType === 'barcode' ? 'numeric' : 'text'}
+              placeholder={feedbackLookup.lookupType === 'barcode' ? 'Correct UPC (optional)' : 'Correct SKU (optional)'}
+              value={feedbackCorrection}
+              onChange={(event) => setFeedbackCorrection(event.target.value)}
+            />
+            <div className="feedback-modal-actions">
+              <button
+                className="primary-button"
+                type="button"
+                data-focusable
+                onClick={() => void saveLookupFeedback(feedbackLookup, 'incorrect', feedbackCorrection)}
+              >
+                Save Incorrect
+              </button>
+              <button
+                className="text-button"
+                type="button"
+                data-focusable
+                onClick={() => {
+                  setFeedbackLookup(null)
+                  setFeedbackCorrection('')
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showConfetti && (
+        <div className="confetti-layer" aria-hidden="true">
+          {Array.from({ length: 28 }, (_, index) => (
+            <span key={index} style={{ '--i': index } as CSSProperties} />
+          ))}
+        </div>
       )}
     </main>
   )

@@ -129,6 +129,109 @@
   min-width: 0;
 }
 
+.feedback-actions {
+  display: flex;
+  gap: 12px;
+  margin: 18px 0 4px;
+}
+
+.feedback-button {
+  flex: 1;
+  min-height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 17px;
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.feedback-button.correct.active,
+.feedback-button.correct:hover {
+  border-color: rgba(65, 255, 155, 0.7);
+  background: rgba(40, 180, 100, 0.24);
+}
+
+.feedback-button.incorrect.active,
+.feedback-button.incorrect:hover {
+  border-color: rgba(255, 95, 95, 0.7);
+  background: rgba(190, 50, 50, 0.24);
+}
+
+.feedback-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.feedback-modal {
+  width: min(520px, calc(100vw - 44px));
+  gap: 14px;
+}
+
+.feedback-modal h2,
+.feedback-modal p {
+  margin: 0;
+}
+
+.feedback-modal p {
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.feedback-modal input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.feedback-modal-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.confetti-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.confetti-layer span {
+  --hue: calc(12deg + (var(--i) * 41deg));
+  position: absolute;
+  top: -18px;
+  left: calc(4% + (var(--i) * 3.4%));
+  width: 10px;
+  height: 18px;
+  border-radius: 4px;
+  background: hsl(var(--hue), 90%, 58%);
+  animation: confetti-fall 1.55s ease-out forwards;
+  animation-delay: calc(var(--i) * 18ms);
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translate3d(0, -20px, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(calc((var(--i) - 14) * 3px), 110vh, 0) rotate(720deg);
+    opacity: 0;
+  }
+}
+
 .lookup-button,
 .primary-button,
 .text-button,
