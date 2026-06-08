@@ -279,6 +279,18 @@ function App() {
     return currentLookup.imagePreview ?? lookupImageObjectUrl
   }
 
+  function barcodeDetectionMethod(notes: string | null | undefined) {
+    if (!notes) {
+      return 'Device scan'
+    }
+
+    if (notes.toLowerCase().includes('gemini')) {
+      return 'Gemini fallback'
+    }
+
+    return 'Device scan'
+  }
+
   function renderLookupDetailCard(currentLookup: ImageLookup, className = 'lookup-detail-card') {
     const imageSrc = lookupImageSrc(currentLookup)
     const isBarcode = currentLookup.lookupType === 'barcode'
@@ -296,8 +308,8 @@ function App() {
                 <strong>{upc ?? 'Not found'}</strong>
               </div>
               <div className="lookup-detail-row">
-                <span>Format</span>
-                <strong>{currentLookup.result?.notes ?? 'Code 128 barcode'}</strong>
+                <span>Method</span>
+                <strong>{barcodeDetectionMethod(currentLookup.result?.notes)}</strong>
               </div>
             </>
           ) : (
