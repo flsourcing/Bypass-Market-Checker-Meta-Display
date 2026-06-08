@@ -365,6 +365,13 @@ function App() {
       pendingLookup = kind === 'barcode'
         ? await handleBarcodeLookup({ keepScreen: true, startStreamOnly: true })
         : await handleImageLookup({ keepScreen: true, startStreamOnly: true })
+      if (!pendingLookup) {
+        setCaptureSessionActive(false)
+        return
+      }
+      setCaptureSessionActive(false)
+      setMessage('Ready. Tap Capture to snap a photo.')
+      return
     }
 
     const pendingLookupId = pendingLookup?.id ?? streamPairLookupId
@@ -987,7 +994,6 @@ function App() {
           : lookup.error ?? 'Lookup failed'
   const isDisplayCaptureBusy = captureSessionActive
     || lookup?.status === 'processing'
-    || (lookup?.status === 'pending' && lookup.captureMode === 'capture')
   const qrCodeUrl = lookup
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(lookup.captureUrl)}`
     : ''
