@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import './App.css'
 import {
   approveDevicePairing,
+  armLookupCapture,
   clearStoredToken,
   createDevicePairing,
   createBarcodeLookup,
@@ -346,6 +347,19 @@ function App() {
 
     setCaptureSessionActive(true)
     setMessage('Processing Capture...')
+
+    if (streamPairLookupId && lookup?.status === 'pending') {
+      try {
+        const { lookup: armedLookup } = await armLookupCapture(token, streamPairLookupId)
+        setLookup(armedLookup)
+        setMessage('Processing Capture...')
+        return
+      } catch (error) {
+        setCaptureSessionActive(false)
+        setMessage(error instanceof Error ? error.message : 'Could not start capture')
+        return
+      }
+    }
 
     if (activeLookupKind === 'barcode') {
       await handleBarcodeLookup({ keepScreen: true, captureRequest: true })

@@ -252,6 +252,13 @@ export async function createBarcodeLookup(
   })
 }
 
+export async function armLookupCapture(token: string, lookupId: string) {
+  return apiRequest<{ lookup: ImageLookup }>(`/lookups/${encodeURIComponent(lookupId)}/arm-capture`, {
+    method: 'POST',
+    token,
+  })
+}
+
 export async function getImageLookup(token: string, lookupId: string) {
   return apiRequest<{ lookup: ImageLookup }>(`/lookups/${encodeURIComponent(lookupId)}`, {
     token,
