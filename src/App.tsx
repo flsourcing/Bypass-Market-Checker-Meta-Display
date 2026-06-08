@@ -64,6 +64,7 @@ function App() {
   const [activeLookupKind, setActiveLookupKind] = useState<LookupKind | null>(null)
   const [displayCaptureArmed, setDisplayCaptureArmed] = useState(false)
   const [captureSessionActive, setCaptureSessionActive] = useState(false)
+  const [captureStartedAt, setCaptureStartedAt] = useState<number | null>(null)
   const [devicePairing, setDevicePairing] = useState<DevicePairing | null>(null)
   const [message, setMessage] = useState('')
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
@@ -278,6 +279,7 @@ function App() {
             && (latestLookup.status === 'complete' || latestLookup.status === 'error')
           ) {
             setCaptureSessionActive(false)
+            setCaptureStartedAt(null)
           }
         })
         .catch((error: unknown) => {
@@ -287,6 +289,20 @@ function App() {
 
     return () => window.clearInterval(interval)
   }, [captureSessionActive, isDisplayApp, lookup, lookupImageObjectUrl, streamPairLookupId, token])
+
+  useEffect(() => {
+    if (!isDisplayApp || !captureSessionActive || !captureStartedAt || lookup?.status !== 'pending') {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      setCaptureSessionActive(false)
+      setCaptureStartedAt(null)
+      setMessage('Capture timed out. Tap Capture to retry.')
+    }, 14_000)
+
+    return () => window.clearTimeout(timeout)
+  }, [captureSessionActive, captureStartedAt, isDisplayApp, lookup?.status])
 
   useEffect(() => {
     if (!token || !lookup || lookup.status !== 'complete' || lookup.imagePreview) {
@@ -326,6 +342,7 @@ function App() {
     setActiveLookupKind(null)
     setDisplayCaptureArmed(false)
     setCaptureSessionActive(false)
+    setCaptureStartedAt(null)
     setMessage('')
   }
 
@@ -356,6 +373,7 @@ function App() {
     }
 
     setCaptureSessionActive(true)
+    setCaptureStartedAt(Date.now())
     setMessage('Processing Capture...')
 
     let pendingLookup = lookup?.status === 'pending' ? lookup : null
@@ -367,9 +385,11 @@ function App() {
         : await handleImageLookup({ keepScreen: true, startStreamOnly: true })
       if (!pendingLookup) {
         setCaptureSessionActive(false)
+        setCaptureStartedAt(null)
         return
       }
       setCaptureSessionActive(false)
+      setCaptureStartedAt(null)
       setMessage('Ready. Tap Capture to snap a photo.')
       return
     }
@@ -377,6 +397,7 @@ function App() {
     const pendingLookupId = pendingLookup?.id ?? streamPairLookupId
     if (!pendingLookupId) {
       setCaptureSessionActive(false)
+      setCaptureStartedAt(null)
       setMessage('Could not start lookup. Try again.')
       return
     }
@@ -390,6 +411,7 @@ function App() {
       setMessage('Processing Capture...')
     } catch (error) {
       setCaptureSessionActive(false)
+      setCaptureStartedAt(null)
       setMessage(error instanceof Error ? error.message : 'Could not start capture')
     }
   }
@@ -984,7 +1006,9 @@ function App() {
     : lookup.status === 'pending'
       ? awaitingCaptureTap
         ? 'Ready. Tap Capture to snap a photo.'
-        : 'Snapping photo...'
+        : captureSessionActive
+          ? 'Snapping photo...'
+          : message || 'Tap Capture to retry.'
       : lookup.status === 'processing'
         ? lookup.lookupType === 'barcode'
           ? 'Reading barcode...'
@@ -1029,6 +1053,11 @@ function App() {
 
       {screen === 'auth' && (
         <section className="glass-card auth-card" aria-label="Account">
+          <img
+            className="brand-logo"
+            src={`${import.meta.env.BASE_URL}bypass_red_square_image.png`}
+            alt="Bypass Market Checker"
+          />
           <p className="eyebrow">Bypass Market Checker</p>
           {isDisplayApp ? (
             <>
@@ -1094,6 +1123,13 @@ function App() {
           className={`home-wrap ${isDisplayApp && displayCaptureArmed ? 'capture-home-wrap display-result-wrap' : ''}`}
           aria-label="Bypass Market Checker"
         >
+          {!displayCaptureArmed && (
+            <img
+              className="home-brand-logo"
+              src={`${import.meta.env.BASE_URL}bypass_red_square_image.png`}
+              alt="Bypass Market Checker"
+            />
+          )}
           <div className="user-chip">{user?.email}</div>
           {isDisplayApp && displayCaptureArmed ? (
             <>
