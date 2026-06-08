@@ -347,10 +347,15 @@ function App() {
     setCaptureSessionActive(true)
     setMessage('Processing Capture...')
 
-    if (streamPairLookupId && lookup?.status === 'pending') {
+    const pendingLookupId = lookup?.status === 'pending'
+      ? (streamPairLookupId ?? lookup.id)
+      : null
+
+    if (pendingLookupId) {
       try {
-        const { lookup: armedLookup } = await armLookupCapture(token, streamPairLookupId)
+        const { lookup: armedLookup } = await armLookupCapture(token, pendingLookupId)
         setLookup(armedLookup)
+        setStreamPairLookupId(null)
         setMessage('Processing Capture...')
         return
       } catch (error) {
@@ -358,11 +363,6 @@ function App() {
         setMessage(error instanceof Error ? error.message : 'Could not start capture')
         return
       }
-    }
-
-    if (lookup?.status === 'pending' && lookup.captureMode === 'capture') {
-      setMessage('Processing Capture...')
-      return
     }
 
     if (activeLookupKind === 'barcode') {
@@ -956,8 +956,8 @@ function App() {
   const displayLookupStatus = !lookup
     ? 'Tap Capture to request a frame from companion.'
     : lookup.status === 'pending'
-      ? lookup.id === streamPairLookupId
-        ? 'Live stream pair requested. Tap Capture when ready.'
+      ? lookup.captureMode === 'stream_pair' || lookup.id === streamPairLookupId
+        ? 'Ready. Tap Capture to snap a photo.'
         : 'Processing Capture...'
       : lookup.status === 'processing'
         ? lookup.lookupType === 'barcode'
