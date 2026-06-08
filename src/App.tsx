@@ -339,38 +339,52 @@ function App() {
     resetDisplayLookup()
   }
 
+  function syncActiveLookupKind(currentLookup: ImageLookup) {
+    if (currentLookup.lookupType === 'barcode') {
+      setActiveLookupKind('barcode')
+      return
+    }
+
+    if (currentLookup.lookupType === 'image') {
+      setActiveLookupKind('image')
+    }
+  }
+
   async function handleDisplayCapture() {
     if (!token) {
       return
     }
 
     setCaptureSessionActive(true)
-    setMessage('Processing Capture...')
+    setMessage('Taking photo...')
 
-    const pendingLookupId = lookup?.status === 'pending'
-      ? (streamPairLookupId ?? lookup.id)
-      : null
+    let pendingLookup = lookup?.status === 'pending' ? lookup : null
 
-    if (pendingLookupId) {
-      try {
-        const { lookup: armedLookup } = await armLookupCapture(token, pendingLookupId)
-        setLookup(armedLookup)
-        setStreamPairLookupId(null)
-        setMessage('Processing Capture...')
-        return
-      } catch (error) {
-        setCaptureSessionActive(false)
-        setMessage(error instanceof Error ? error.message : 'Could not start capture')
-        return
-      }
+    if (!pendingLookup) {
+      const kind = activeLookupKind ?? 'image'
+      pendingLookup = kind === 'barcode'
+        ? await handleBarcodeLookup({ keepScreen: true, startStreamOnly: true })
+        : await handleImageLookup({ keepScreen: true, startStreamOnly: true })
     }
 
-    if (activeLookupKind === 'barcode') {
-      await handleBarcodeLookup({ keepScreen: true, captureRequest: true })
+    const pendingLookupId = pendingLookup?.id ?? streamPairLookupId
+    if (!pendingLookupId) {
+      setCaptureSessionActive(false)
+      setMessage('Could not start lookup. Try again.')
       return
     }
 
-    await handleImageLookup({ keepScreen: true, captureRequest: true })
+    try {
+      const { lookup: armedLookup } = await armLookupCapture(token, pendingLookupId)
+      syncActiveLookupKind(armedLookup)
+      setLookup(armedLookup)
+      setStreamPairLookupId(null)
+      setDisplayCaptureArmed(true)
+      setMessage('Taking photo...')
+    } catch (error) {
+      setCaptureSessionActive(false)
+      setMessage(error instanceof Error ? error.message : 'Could not start capture')
+    }
   }
 
   function formatLookupDate(value: string) {
@@ -804,15 +818,15 @@ function App() {
   async function handleLookup(
     kind: LookupKind,
     options?: { keepScreen?: boolean; captureRequest?: boolean; startStreamOnly?: boolean },
-  ) {
+  ): Promise<ImageLookup | null> {
     if (!token) {
       setScreen('auth')
-      return
+      return null
     }
 
     if (kind === 'image' && !apiKeys.some((record) => record.provider === 'gemini')) {
       setMessage('Add a Gemini API key in Settings before image lookup.')
-      return
+      return null
     }
 
     setActiveLookupKind(kind)
@@ -846,6 +860,7 @@ function App() {
         : 'capture'
       const createLookup = kind === 'barcode' ? createBarcodeLookup : createImageLookup
       const { lookup: createdLookup } = await createLookup(token, lookupMode)
+      syncActiveLookupKind(createdLookup)
       setLookup(createdLookup)
       if (isDisplayApp && options?.startStreamOnly) {
         setStreamPairLookupId(createdLookup.id)
@@ -863,19 +878,21 @@ function App() {
               ? 'Scanning Barcode'
               : 'Looking Up Product',
       )
+      return createdLookup
     } catch (error) {
       setMessage(error instanceof Error ? error.message : `Could not start ${kind} lookup`)
+      return null
     } finally {
       setIsBusy(false)
     }
   }
 
   async function handleImageLookup(options?: { keepScreen?: boolean; captureRequest?: boolean; startStreamOnly?: boolean }) {
-    await handleLookup('image', options)
+    return handleLookup('image', options)
   }
 
   async function handleBarcodeLookup(options?: { keepScreen?: boolean; captureRequest?: boolean; startStreamOnly?: boolean }) {
-    await handleLookup('barcode', options)
+    return handleLookup('barcode', options)
   }
 
   function handleLogout() {
@@ -953,22 +970,24 @@ function App() {
       : isDisplayApp
         ? 'Waiting for Mobile Stream Pair'
         : message || 'Looking Up Product'
+  const awaitingCaptureTap = lookup?.status === 'pending'
+    && (lookup.captureMode === 'stream_pair' || lookup.id === streamPairLookupId)
   const displayLookupStatus = !lookup
-    ? 'Tap Capture to request a frame from companion.'
+    ? 'Tap Capture to snap a photo.'
     : lookup.status === 'pending'
-      ? lookup.captureMode === 'stream_pair' || lookup.id === streamPairLookupId
+      ? awaitingCaptureTap
         ? 'Ready. Tap Capture to snap a photo.'
-        : 'Processing Capture...'
+        : 'Taking photo...'
       : lookup.status === 'processing'
         ? lookup.lookupType === 'barcode'
-          ? 'Reading barcode with Gemini...'
-          : 'Processing Capture...'
+          ? 'Reading barcode...'
+          : 'Identifying product...'
         : lookup.status === 'complete'
           ? 'Capture complete.'
           : lookup.error ?? 'Lookup failed'
-  const isDisplayCaptureBusy = captureSessionActive
-    || lookup?.status === 'processing'
-    || (lookup?.status === 'pending' && lookup.id !== streamPairLookupId)
+  const isDisplayCaptureBusy = lookup?.status === 'processing'
+    || (lookup?.status === 'pending' && lookup.captureMode === 'capture')
+    || (captureSessionActive && !awaitingCaptureTap)
   const qrCodeUrl = lookup
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(lookup.captureUrl)}`
     : ''
