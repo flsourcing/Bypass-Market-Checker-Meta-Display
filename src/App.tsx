@@ -126,6 +126,14 @@ function App() {
         const nextIndex = currentIndex <= 0 ? focusableElements.length - 1 : currentIndex - 1
         focusableElements[nextIndex]?.focus()
       }
+
+      if (event.key === 'Enter' || event.key === ' ') {
+        const target = event.target as HTMLElement | null
+        if (target?.matches('button[data-focusable]:not(:disabled)')) {
+          event.preventDefault()
+          target.click()
+        }
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -624,21 +632,37 @@ function App() {
     }
   }
 
-  async function handleStockXLogin() {
+  function handleStockXLogin() {
     if (!token) {
       return
     }
 
+    const popup = window.open('about:blank', 'stockx_oauth', 'noopener,noreferrer,width=520,height=760')
     setIsBusy(true)
-    setMessage('')
+    setMessage('Opening StockX login...')
 
-    try {
-      const result = await startStockXOAuth(token)
-      window.location.href = result.authUrl
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not start StockX login')
-      setIsBusy(false)
-    }
+    void startStockXOAuth(token)
+      .then((result) => {
+        if (!result.authUrl) {
+          throw new Error('StockX login URL missing from server')
+        }
+
+        if (popup && !popup.closed) {
+          popup.location.replace(result.authUrl)
+          popup.focus()
+          setMessage('Finish StockX login in the popup window, then return here.')
+          return
+        }
+
+        window.location.assign(result.authUrl)
+      })
+      .catch((error) => {
+        popup?.close()
+        setMessage(error instanceof Error ? error.message : 'Could not start StockX login')
+      })
+      .finally(() => {
+        setIsBusy(false)
+      })
   }
 
   async function handleDeleteAliasIntegration() {
@@ -1119,6 +1143,8 @@ function App() {
               Done
             </button>
           </div>
+
+          {message && <p className="center-message settings-message">{message}</p>}
 
           <div className="key-list">
             {apiKeys.filter((record) => record.provider === 'gemini').length === 0 && <p>No API keys saved.</p>}
