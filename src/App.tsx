@@ -152,7 +152,19 @@ function App() {
   }, [devicePairing, isDisplayApp])
 
   useEffect(() => {
-    if (!token || !lookup || (lookup.status !== 'pending' && lookup.status !== 'processing')) {
+    if (!token || !lookup) {
+      return
+    }
+
+    const waitingForImage = lookup.status === 'complete'
+      && !lookup.imagePreview
+      && !lookupImageObjectUrl
+
+    if (
+      lookup.status !== 'pending'
+      && lookup.status !== 'processing'
+      && !waitingForImage
+    ) {
       return
     }
 
@@ -172,21 +184,20 @@ function App() {
         .catch((error: unknown) => {
           setMessage(error instanceof Error ? error.message : 'Unable to check lookup status')
         })
-    }, isDisplayApp && captureSessionActive ? 800 : isDisplayApp ? 1200 : 3000)
+    }, isDisplayApp && (captureSessionActive || waitingForImage) ? 800 : isDisplayApp ? 1200 : 3000)
 
     return () => window.clearInterval(interval)
-  }, [captureSessionActive, isDisplayApp, lookup, streamPairLookupId, token])
+  }, [captureSessionActive, isDisplayApp, lookup, lookupImageObjectUrl, streamPairLookupId, token])
 
   useEffect(() => {
-    if (!token || !lookup?.imageUrl || lookup.status !== 'complete') {
-      setLookupImageObjectUrl(null)
+    if (!token || !lookup || lookup.status !== 'complete' || lookup.imagePreview) {
       return
     }
 
     let cancelled = false
     let objectUrl: string | null = null
 
-    fetchLookupImageBlob(token, lookup.imageUrl)
+    fetchLookupImageBlob(token, lookup.id)
       .then((blob) => {
         if (cancelled) {
           return
@@ -207,7 +218,7 @@ function App() {
         URL.revokeObjectURL(objectUrl)
       }
     }
-  }, [lookup?.id, lookup?.imageUrl, lookup?.status, token])
+  }, [lookup?.id, lookup?.imagePreview, lookup?.status, token])
 
   function resetDisplayLookup() {
     setLookup(null)
@@ -244,16 +255,16 @@ function App() {
       .join(' ') || 'Unknown product'
   }
 
+  function lookupImageSrc(currentLookup: ImageLookup) {
+    return currentLookup.imagePreview ?? lookupImageObjectUrl
+  }
+
   function renderLookupDetailCard(currentLookup: ImageLookup, className = 'lookup-detail-card') {
+    const imageSrc = lookupImageSrc(currentLookup)
+
     return (
       <section className={`glass-card ${className}`} aria-label="Lookup Result">
-        {lookupImageObjectUrl && (
-          <img
-            className="captured-preview"
-            src={lookupImageObjectUrl}
-            alt="Captured product"
-          />
-        )}
+        <p className="eyebrow">Lookup Result</p>
 
         <div className="lookup-detail-grid">
           <div className="lookup-detail-row">
@@ -273,6 +284,16 @@ function App() {
             <strong>{formatLookupDate(currentLookup.updatedAt || currentLookup.createdAt)}</strong>
           </div>
         </div>
+
+        {imageSrc ? (
+          <img
+            className="captured-preview captured-preview-below"
+            src={imageSrc}
+            alt="Captured product"
+          />
+        ) : (
+          <p className="image-loading-note">Loading captured photo...</p>
+        )}
       </section>
     )
   }
@@ -534,7 +555,7 @@ function App() {
     : ''
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${isDisplayApp ? 'display-app-shell' : ''}`}>
       {screen !== 'auth' && (
         <button
           className="settings-button"
@@ -614,7 +635,7 @@ function App() {
 
       {screen === 'home' && (
         <section
-          className={`home-wrap ${isDisplayApp && displayCaptureArmed ? 'capture-home-wrap' : ''}`}
+          className={`home-wrap ${isDisplayApp && displayCaptureArmed ? 'capture-home-wrap display-result-wrap' : ''}`}
           aria-label="Bypass Market Checker"
         >
           <div className="user-chip">{user?.email}</div>

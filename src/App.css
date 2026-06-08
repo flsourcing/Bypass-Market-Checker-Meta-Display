@@ -22,6 +22,49 @@
   position: relative;
 }
 
+.app-shell.display-app-shell {
+  overflow-x: hidden;
+  overflow-y: auto;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.home-wrap.display-result-wrap {
+  align-items: stretch;
+  justify-content: flex-start;
+  height: auto;
+  min-height: calc(100svh - 36px);
+  padding-bottom: 150px;
+}
+
+.capture-home-wrap.display-result-wrap {
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.lookup-detail-card.home-result,
+.processing-card.home-result {
+  max-height: none;
+  overflow: visible;
+}
+
+.image-loading-note {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 14px;
+  text-align: center;
+}
+
+.captured-preview-below {
+  margin-top: 6px;
+  max-height: none;
+  min-height: 180px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .capture-home-wrap {
   align-items: center;
   justify-content: center;

@@ -41,6 +41,7 @@ export type ImageLookup = {
   result: LookupResult | null
   error: string | null
   imageUrl: string | null
+  imagePreview: string | null
   createdAt: string
   updatedAt: string
 }
@@ -178,8 +179,8 @@ export async function getImageLookup(token: string, lookupId: string) {
   })
 }
 
-export async function fetchLookupImageBlob(token: string, imageUrl: string) {
-  const response = await fetch(imageUrl, {
+export async function fetchLookupImageBlob(token: string, lookupId: string) {
+  const response = await fetch(`${API_BASE_URL}/lookups/${encodeURIComponent(lookupId)}/image`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
