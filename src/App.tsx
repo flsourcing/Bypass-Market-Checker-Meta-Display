@@ -67,8 +67,6 @@ function App() {
   const [captureSessionActive, setCaptureSessionActive] = useState(false)
   const [devicePairing, setDevicePairing] = useState<DevicePairing | null>(null)
   const [message, setMessage] = useState('')
-  const [feedbackLookup, setFeedbackLookup] = useState<ImageLookup | null>(null)
-  const [feedbackNote, setFeedbackNote] = useState('')
   const [showConfetti, setShowConfetti] = useState(false)
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
@@ -430,6 +428,29 @@ function App() {
     return 'Device scan'
   }
 
+  function displayLookupValue(value: string | null | undefined) {
+    return value?.trim() || 'Not found'
+  }
+
+  function withFeedback(
+    currentLookup: ImageLookup,
+    status: 'correct' | 'incorrect',
+    note: string,
+  ): ImageLookup {
+    const now = new Date().toISOString()
+
+    return {
+      ...currentLookup,
+      feedback: {
+        status,
+        correction: note.trim() || null,
+        createdAt: currentLookup.feedback?.createdAt ?? now,
+        updatedAt: now,
+      },
+      updatedAt: now,
+    }
+  }
+
   function triggerConfetti() {
     setShowConfetti(false)
     window.setTimeout(() => setShowConfetti(true), 0)
@@ -446,6 +467,16 @@ function App() {
       return
     }
 
+    if (currentLookup.feedback) {
+      setMessage('Feedback has already been saved for this lookup.')
+      return
+    }
+
+    const optimisticLookup = withFeedback(currentLookup, status, note)
+    setLookup((visibleLookup) => (
+      visibleLookup?.id === currentLookup.id ? optimisticLookup : visibleLookup
+    ))
+
     try {
       const { lookup: updatedLookup } = await submitLookupFeedback(
         token,
@@ -453,25 +484,26 @@ function App() {
         status,
         note,
       )
-      setLookup(updatedLookup)
-      setFeedbackLookup(null)
-      setFeedbackNote('')
+      setLookup((visibleLookup) => {
+        if (visibleLookup?.id !== currentLookup.id) {
+          return visibleLookup
+        }
+
+        return updatedLookup.feedback ? updatedLookup : {
+          ...updatedLookup,
+          feedback: optimisticLookup.feedback,
+        }
+      })
       setMessage(status === 'correct' ? 'Marked correct.' : 'Marked incorrect. Thanks for helping improve results.')
       if (status === 'correct') {
         triggerConfetti()
       }
     } catch (error) {
+      setLookup((visibleLookup) => (
+        visibleLookup?.id === currentLookup.id ? currentLookup : visibleLookup
+      ))
       setMessage(error instanceof Error ? error.message : 'Could not save feedback')
     }
-  }
-
-  function openIncorrectFeedback(currentLookup: ImageLookup) {
-    if (currentLookup.feedback) {
-      setMessage('Feedback has already been saved for this lookup.')
-      return
-    }
-    setFeedbackLookup(currentLookup)
-    setFeedbackNote('')
   }
 
   function renderLookupDetailCard(currentLookup: ImageLookup, className = 'lookup-detail-card') {
@@ -500,7 +532,7 @@ function App() {
             <>
               <div className="lookup-detail-row">
                 <span>UPC</span>
-                <strong>{upc ?? 'Not found'}</strong>
+                <strong>{displayLookupValue(upc)}</strong>
               </div>
               <div className="lookup-detail-row">
                 <span>Method</span>
@@ -515,7 +547,7 @@ function App() {
               </div>
               <div className="lookup-detail-row">
                 <span>SKU</span>
-                <strong>{currentLookup.result?.sku ?? 'Not found'}</strong>
+                <strong>{displayLookupValue(currentLookup.result?.sku)}</strong>
               </div>
               <div className="lookup-detail-row">
                 <span>Accuracy</span>
@@ -539,26 +571,26 @@ function App() {
           </div>
         </div>
 
-        <div className="feedback-actions">
-          <button
-            className={`feedback-button correct ${currentLookup.feedback?.status === 'correct' ? 'active' : ''}`}
-            type="button"
-            data-focusable
-            disabled={Boolean(currentLookup.feedback)}
-            onClick={() => void saveLookupFeedback(currentLookup, 'correct')}
-          >
-            Correct
-          </button>
-          <button
-            className={`feedback-button incorrect ${currentLookup.feedback?.status === 'incorrect' ? 'active' : ''}`}
-            type="button"
-            data-focusable
-            disabled={Boolean(currentLookup.feedback)}
-            onClick={() => openIncorrectFeedback(currentLookup)}
-          >
-            Incorrect
-          </button>
-        </div>
+        {!currentLookup.feedback && (
+          <div className="feedback-actions">
+            <button
+              className="feedback-button correct"
+              type="button"
+              data-focusable
+              onClick={() => void saveLookupFeedback(currentLookup, 'correct')}
+            >
+              Correct
+            </button>
+            <button
+              className="feedback-button incorrect"
+              type="button"
+              data-focusable
+              onClick={() => void saveLookupFeedback(currentLookup, 'incorrect')}
+            >
+              Incorrect
+            </button>
+          </div>
+        )}
 
         {(imageSrc || aliasImage) && (
           <div className="product-image-compare">
@@ -1573,48 +1605,6 @@ function App() {
             )}
           </div>
         </section>
-      )}
-
-      {feedbackLookup && (
-        <div className="feedback-modal-backdrop" role="dialog" aria-modal="true" aria-label="Incorrect Feedback">
-          <section className="feedback-modal glass-card">
-            <p className="eyebrow">Incorrect Result</p>
-            <h2>Help improve future matches</h2>
-            <p>
-              Optional: tell us what was wrong with the result. Notes help our systems get better over time.
-            </p>
-            <input
-              data-focusable
-              autoFocus
-              type="text"
-              inputMode="text"
-              placeholder="Optional note"
-              value={feedbackNote}
-              onChange={(event) => setFeedbackNote(event.target.value)}
-            />
-            <div className="feedback-modal-actions">
-              <button
-                className="primary-button"
-                type="button"
-                data-focusable
-                onClick={() => void saveLookupFeedback(feedbackLookup, 'incorrect', feedbackNote)}
-              >
-                Save Incorrect
-              </button>
-              <button
-                className="text-button"
-                type="button"
-                data-focusable
-                onClick={() => {
-                  setFeedbackLookup(null)
-                  setFeedbackNote('')
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </section>
-        </div>
       )}
 
       {showConfetti && (
