@@ -35,9 +35,12 @@ import {
   requestLookupDictation,
   getLookupDictation,
   cancelLookupDictation,
+  searchCatalog,
+  createTextLookup,
 } from './api'
 import type {
   ApiKeyRecord,
+  CatalogSearchItem,
   DevicePairing,
   ImageLookup,
   IntegrationStatus,
@@ -45,7 +48,7 @@ import type {
   User,
 } from './api'
 
-type Screen = 'auth' | 'home' | 'settings' | 'lookup'
+type Screen = 'auth' | 'home' | 'settings' | 'lookup' | 'text-lookup'
 type AuthMode = 'login' | 'register'
 type LookupKind = 'image' | 'barcode'
 
@@ -90,6 +93,8 @@ function App() {
   const feedbackDictationLookupIdRef = useRef<string | null>(null)
   const feedbackDictationStartedAtRef = useRef(0)
   const feedbackKeyboardShiftRef = useRef(false)
+  const textSearchShiftRef = useRef(false)
+  const textSearchDebounceRef = useRef<number | null>(null)
   const [screen, setScreen] = useState<Screen>('auth')
   const [authMode, setAuthMode] = useState<AuthMode>('login')
   const [token, setToken] = useState<string | null>(() => getStoredToken())
@@ -117,10 +122,21 @@ function App() {
   const [feedbackKeyboardNumbers, setFeedbackKeyboardNumbers] = useState(false)
   const [feedbackModalMessage, setFeedbackModalMessage] = useState('')
   const [isListeningForFeedback, setIsListeningForFeedback] = useState(false)
+  const [textSearchQuery, setTextSearchQuery] = useState('')
+  const [textSuggestions, setTextSuggestions] = useState<CatalogSearchItem[]>([])
+  const [textSearchKeyboardOpen, setTextSearchKeyboardOpen] = useState(false)
+  const [textSearchKeyboardFocus, setTextSearchKeyboardFocus] = useState({ row: 0, col: 0 })
+  const [textSearchKeyboardShift, setTextSearchKeyboardShift] = useState(false)
+  const [textSearchKeyboardNumbers, setTextSearchKeyboardNumbers] = useState(false)
+  const [textSearchMessage, setTextSearchMessage] = useState('')
 
   useEffect(() => {
     feedbackKeyboardShiftRef.current = feedbackKeyboardShift
   }, [feedbackKeyboardShift])
+
+  useEffect(() => {
+    textSearchShiftRef.current = textSearchKeyboardShift
+  }, [textSearchKeyboardShift])
   const [showConfetti, setShowConfetti] = useState(false)
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
@@ -147,6 +163,18 @@ function App() {
       return
     }
 
+    if (screen === 'text-lookup') {
+      if (isDisplayApp) {
+        setTextSearchKeyboardOpen(true)
+        setTextSearchKeyboardFocus({ row: 0, col: 0 })
+      }
+
+      window.requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>('.text-lookup-input')?.focus()
+      })
+      return
+    }
+
     if (
       isDisplayApp
       && displayCaptureArmed
@@ -162,7 +190,43 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const textInputActive = Boolean(screen === 'text-lookup' && textSearchKeyboardOpen)
       const feedbackInputActive = Boolean(feedbackKeyboardOpen && feedbackLookup)
+
+      if (textInputActive) {
+        const keyboardRows = getFeedbackKeyboardRows(textSearchKeyboardNumbers)
+
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault()
+          setTextSearchKeyboardFocus((current) => {
+            const direction = event.key === 'ArrowDown' ? 1 : -1
+            const nextRow = (current.row + direction + keyboardRows.length) % keyboardRows.length
+            const nextCol = Math.min(current.col, keyboardRows[nextRow].length - 1)
+            return { row: nextRow, col: nextCol }
+          })
+          return
+        }
+
+        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+          event.preventDefault()
+          setTextSearchKeyboardFocus((current) => {
+            const rowLength = keyboardRows[current.row].length
+            const direction = event.key === 'ArrowRight' ? 1 : -1
+            const nextCol = (current.col + direction + rowLength) % rowLength
+            return { ...current, col: nextCol }
+          })
+          return
+        }
+
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          const key = keyboardRows[textSearchKeyboardFocus.row]?.[textSearchKeyboardFocus.col]
+          if (key) {
+            pressTextSearchKey(key)
+          }
+          return
+        }
+      }
 
       if (feedbackInputActive) {
         const keyboardRows = getFeedbackKeyboardRows(feedbackKeyboardNumbers)
@@ -237,7 +301,9 @@ function App() {
 
       const focusableSelector = feedbackLookup
         ? '.feedback-modal [data-focusable]'
-        : '[data-focusable]'
+        : screen === 'text-lookup'
+          ? '.text-lookup-screen [data-focusable]'
+          : '[data-focusable]'
       const focusableElements = Array.from(
         document.querySelectorAll<HTMLElement>(focusableSelector),
       )
@@ -267,7 +333,50 @@ function App() {
     window.addEventListener('keydown', handleKeyDown)
 
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [feedbackKeyboardFocus, feedbackKeyboardOpen, feedbackKeyboardNumbers, feedbackLookup, isDisplayApp])
+  }, [
+    feedbackKeyboardFocus,
+    feedbackKeyboardOpen,
+    feedbackKeyboardNumbers,
+    feedbackLookup,
+    isDisplayApp,
+    screen,
+    textSearchKeyboardFocus,
+    textSearchKeyboardOpen,
+    textSearchKeyboardNumbers,
+  ])
+
+  useEffect(() => {
+    if (screen !== 'text-lookup' || !token) {
+      return
+    }
+
+    if (textSearchDebounceRef.current) {
+      window.clearTimeout(textSearchDebounceRef.current)
+    }
+
+    if (textSearchQuery.trim().length < 2) {
+      setTextSuggestions([])
+      return
+    }
+
+    textSearchDebounceRef.current = window.setTimeout(() => {
+      void searchCatalog(token, textSearchQuery.trim(), 10)
+        .then(({ items }) => {
+          setTextSuggestions(items)
+          setTextSearchMessage(items.length === 0 ? 'No matches yet. Keep typing or try another term.' : '')
+        })
+        .catch((error: unknown) => {
+          setTextSuggestions([])
+          setTextSearchMessage(error instanceof Error ? error.message : 'Could not search catalog')
+        })
+    }, 300)
+
+    return () => {
+      if (textSearchDebounceRef.current) {
+        window.clearTimeout(textSearchDebounceRef.current)
+      }
+    }
+  }, [screen, textSearchQuery, token])
 
   useEffect(() => () => {
     if (feedbackDictationPollRef.current) {
@@ -743,6 +852,111 @@ function App() {
     setFeedbackNote((current) => `${current}${key}`)
   }
 
+  function openTextLookup() {
+    setTextSearchQuery('')
+    setTextSuggestions([])
+    setTextSearchMessage('')
+    setTextSearchKeyboardShift(false)
+    setTextSearchKeyboardNumbers(false)
+    setTextSearchKeyboardOpen(isDisplayApp)
+    setTextSearchKeyboardFocus({ row: 0, col: 0 })
+    setMessage('')
+    setScreen('text-lookup')
+
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('.text-lookup-input')?.focus()
+    })
+  }
+
+  function closeTextLookup() {
+    setScreen('home')
+    setTextSearchQuery('')
+    setTextSuggestions([])
+    setTextSearchMessage('')
+    setTextSearchKeyboardOpen(false)
+  }
+
+  function pressTextSearchKey(key: string) {
+    if (key === 'Shift') {
+      setTextSearchKeyboardShift((current) => !current)
+      return
+    }
+
+    if (key === '123') {
+      setTextSearchKeyboardNumbers(true)
+      setTextSearchKeyboardFocus({ row: 0, col: 0 })
+      return
+    }
+
+    if (key === 'ABC') {
+      setTextSearchKeyboardNumbers(false)
+      setTextSearchKeyboardFocus({ row: 0, col: 0 })
+      return
+    }
+
+    if (key === 'Backspace') {
+      setTextSearchQuery((current) => current.slice(0, -1))
+      return
+    }
+
+    if (key === 'Clear') {
+      setTextSearchQuery('')
+      setTextSuggestions([])
+      return
+    }
+
+    if (key === 'Done') {
+      setTextSearchKeyboardOpen(false)
+      return
+    }
+
+    if (key === 'Space') {
+      setTextSearchQuery((current) => `${current} `)
+      return
+    }
+
+    if (key.length === 1 && /[A-Z]/.test(key)) {
+      const useUpper = textSearchShiftRef.current
+      setTextSearchQuery((current) => `${current}${useUpper ? key : key.toLowerCase()}`)
+      return
+    }
+
+    setTextSearchQuery((current) => `${current}${key}`)
+  }
+
+  async function performTextLookup(item: CatalogSearchItem) {
+    if (!token) {
+      setTextSearchMessage('Log in before running text lookup.')
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('Loading market data...')
+    setTextSearchMessage('')
+
+    try {
+      const { lookup: createdLookup } = await createTextLookup(token, {
+        sku: item.sku,
+        name: item.name,
+        brand: item.brand,
+        imageUrl: item.imageUrl,
+        source: item.source,
+      })
+      setLookup(createdLookup)
+      setActiveLookupKind(null)
+      setDisplayCaptureArmed(true)
+      setScreen('home')
+      setTextSearchQuery('')
+      setTextSuggestions([])
+      setTextSearchKeyboardOpen(false)
+      setMessage('Text lookup complete. Loading market prices...')
+    } catch (error) {
+      setTextSearchMessage(error instanceof Error ? error.message : 'Could not run text lookup')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
   function activateFeedbackTarget(target: string, action: () => void) {
     const now = Date.now()
     const lastActivation = lastFeedbackActivationRef.current
@@ -830,6 +1044,8 @@ function App() {
   function renderLookupDetailCard(currentLookup: ImageLookup, className = 'lookup-detail-card') {
     const imageSrc = lookupImageSrc(currentLookup)
     const isBarcode = currentLookup.lookupType === 'barcode'
+    const isText = currentLookup.lookupType === 'text'
+    const catalogImage = currentLookup.catalogImageUrl ?? null
     const upc = currentLookup.result?.upc ?? currentLookup.result?.sku
     const marketData = currentLookup.marketData
     const aliasImage = marketData?.alias?.product.mainPictureUrl ?? null
@@ -858,6 +1074,21 @@ function App() {
               <div className="lookup-detail-row">
                 <span>Method</span>
                 <strong>{barcodeDetectionMethod(currentLookup.result?.notes)}</strong>
+              </div>
+            </>
+          ) : isText ? (
+            <>
+              <div className="lookup-detail-row">
+                <span>Product</span>
+                <strong>{lookupProductName(currentLookup)}</strong>
+              </div>
+              <div className="lookup-detail-row">
+                <span>SKU</span>
+                <strong>{displayLookupValue(currentLookup.result?.sku)}</strong>
+              </div>
+              <div className="lookup-detail-row">
+                <span>Method</span>
+                <strong>Text search</strong>
               </div>
             </>
           ) : (
@@ -913,15 +1144,15 @@ function App() {
           </div>
         )}
 
-        {(imageSrc || aliasImage) && (
+        {(imageSrc || catalogImage || aliasImage) && (
           <div className="product-image-compare">
-            {imageSrc && (
+            {(imageSrc || catalogImage) && (
               <div className="product-image-card">
-                <span>Your Photo</span>
+                <span>{isText ? 'Catalog' : 'Your Photo'}</span>
                 <img
                   className="captured-preview captured-preview-below"
-                  src={imageSrc}
-                  alt={isBarcode ? 'Captured barcode' : 'Captured product'}
+                  src={imageSrc || catalogImage || ''}
+                  alt={isText ? 'Catalog product' : isBarcode ? 'Captured barcode' : 'Captured product'}
                 />
               </div>
             )}
@@ -938,7 +1169,7 @@ function App() {
           </div>
         )}
 
-        {!imageSrc && !aliasImage && (
+        {!imageSrc && !catalogImage && !aliasImage && !isText && (
           <p className="image-loading-note">Loading captured photo...</p>
         )}
 
@@ -1608,11 +1839,127 @@ function App() {
                 >
                   Barcode Lookup
                 </button>
+
+                <button
+                  className="lookup-button"
+                  type="button"
+                  data-focusable
+                  onClick={openTextLookup}
+                  disabled={isBusy}
+                >
+                  Text Lookup
+                </button>
               </section>
               {(needsKeyMessage || message) && (
                 <p className="center-message">{message || needsKeyMessage}</p>
               )}
             </>
+          )}
+        </section>
+      )}
+
+      {screen === 'text-lookup' && (
+        <section className="glass-card text-lookup-screen" aria-label="Text Lookup">
+          <div className="card-header">
+            <div>
+              <p className="eyebrow">Text Lookup</p>
+              <h1>Search by name or SKU</h1>
+            </div>
+            <button className="text-button" type="button" data-focusable onClick={closeTextLookup}>
+              Back
+            </button>
+          </div>
+
+          {isDisplayApp && (
+            <p className="feedback-glasses-hint">
+              Tap the search box, then use the on-screen keyboard. Select a match to load market prices.
+            </p>
+          )}
+
+          <div className="text-lookup-search-wrap">
+            <input
+              className="text-lookup-input"
+              data-focusable
+              autoFocus
+              type="text"
+              inputMode="search"
+              readOnly={isDisplayApp}
+              placeholder="Search product name or SKU"
+              value={textSearchQuery}
+              onFocus={() => {
+                setTextSearchKeyboardOpen(true)
+                if (isDisplayApp) {
+                  setTextSearchKeyboardFocus({ row: 0, col: 0 })
+                }
+              }}
+              onClick={() => {
+                setTextSearchKeyboardOpen(true)
+                if (isDisplayApp) {
+                  setTextSearchKeyboardFocus({ row: 0, col: 0 })
+                }
+              }}
+              onChange={(event) => setTextSearchQuery(event.target.value)}
+            />
+          </div>
+
+          {textSearchMessage && (
+            <p className="feedback-modal-message">{textSearchMessage}</p>
+          )}
+
+          <div className="catalog-suggestions" data-scrollable data-focusable tabIndex={0}>
+            {textSuggestions.length === 0 && textSearchQuery.trim().length >= 2 && !textSearchMessage && (
+              <p className="catalog-empty-note">Searching StockX and Alias...</p>
+            )}
+            {textSuggestions.map((item) => (
+              <button
+                className="catalog-suggestion-row"
+                key={`${item.source}-${item.id}`}
+                type="button"
+                data-focusable
+                disabled={isBusy}
+                onClick={() => void performTextLookup(item)}
+              >
+                {item.imageUrl ? (
+                  <img className="catalog-suggestion-image" src={item.imageUrl} alt="" />
+                ) : (
+                  <div className="catalog-suggestion-image placeholder">{item.source === 'stockx' ? 'SX' : 'AL'}</div>
+                )}
+                <div className="catalog-suggestion-copy">
+                  <strong>{item.name}</strong>
+                  <span>{item.sku}</span>
+                  <span className="catalog-suggestion-source">{item.source === 'stockx' ? 'StockX' : 'Alias'}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {textSearchKeyboardOpen && (
+            <div className="feedback-keyboard" aria-label="Text search keyboard">
+              {getFeedbackKeyboardRows(textSearchKeyboardNumbers).map((row, rowIndex) => (
+                <div className="feedback-keyboard-row" key={`text-${textSearchKeyboardNumbers ? 'num' : 'alpha'}-${row.join('')}`}>
+                  {row.map((key, colIndex) => {
+                    const isActive = textSearchKeyboardFocus.row === rowIndex
+                      && textSearchKeyboardFocus.col === colIndex
+                    const isWide = FEEDBACK_KEYBOARD_WIDE_KEYS.has(key)
+                    const isShiftActive = key === 'Shift' && textSearchKeyboardShift
+
+                    return (
+                      <button
+                        className={`feedback-key ${isActive ? 'active' : ''} ${isWide ? 'wide' : ''} ${isShiftActive ? 'shift-active' : ''}`}
+                        key={`text-${key}`}
+                        type="button"
+                        aria-label={key}
+                        onFocus={() => setTextSearchKeyboardFocus({ row: rowIndex, col: colIndex })}
+                        onPointerUp={() => activateFeedbackTarget(`text:${key}`, () => pressTextSearchKey(key))}
+                        onClick={() => activateFeedbackTarget(`text:${key}`, () => pressTextSearchKey(key))}
+                      >
+                        {getFeedbackKeyLabel(key, textSearchKeyboardShift, textSearchKeyboardNumbers)}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
           )}
         </section>
       )}

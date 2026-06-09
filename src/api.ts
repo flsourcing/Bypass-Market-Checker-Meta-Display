@@ -106,13 +106,15 @@ export type ImageLookup = {
   captureCode: string
   captureUrl: string
   provider: string
-  lookupType: 'image' | 'barcode'
-  captureMode: 'stream_pair' | 'capture' | 'mobile'
+  lookupType: 'image' | 'barcode' | 'text'
+  captureMode: 'stream_pair' | 'capture' | 'mobile' | 'text'
   status: 'pending' | 'processing' | 'complete' | 'error'
   result: LookupResult | null
   error: string | null
   imageUrl: string | null
   imagePreview: string | null
+  catalogImageUrl?: string | null
+  textLookupSource?: string | null
   marketStatus: 'loading' | 'complete' | 'partial' | 'error' | null
   marketData: LookupMarketData | null
   feedback: {
@@ -123,6 +125,15 @@ export type ImageLookup = {
   } | null
   createdAt: string
   updatedAt: string
+}
+
+export type CatalogSearchItem = {
+  id: string
+  source: 'stockx' | 'alias'
+  name: string
+  sku: string
+  brand: string
+  imageUrl: string | null
 }
 
 export type DevicePairing = {
@@ -317,6 +328,28 @@ export async function cancelLookupDictation(token: string, lookupId: string) {
       token,
     },
   )
+}
+
+export async function searchCatalog(token: string, query: string, limit = 10) {
+  const params = new URLSearchParams({
+    query,
+    limit: String(limit),
+  })
+
+  return apiRequest<{ items: CatalogSearchItem[] }>(`/lookups/catalog/search?${params.toString()}`, {
+    token,
+  })
+}
+
+export async function createTextLookup(
+  token: string,
+  item: Pick<CatalogSearchItem, 'sku' | 'name' | 'brand' | 'imageUrl' | 'source'>,
+) {
+  return apiRequest<{ lookup: ImageLookup }>('/lookups/text', {
+    method: 'POST',
+    token,
+    body: item,
+  })
 }
 
 export async function fetchLookupImageBlob(token: string, lookupId: string) {
