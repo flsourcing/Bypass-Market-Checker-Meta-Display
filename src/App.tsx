@@ -1814,6 +1814,8 @@ function App() {
                 data-focusable
                 aria-label="Dictate incorrect feedback note"
                 onFocus={() => setFeedbackKeyboardFocus({ row: -1, col: 0 })}
+                onPointerEnter={() => setFeedbackKeyboardFocus({ row: -1, col: 0 })}
+                onPointerDown={() => setFeedbackKeyboardFocus({ row: -1, col: 0 })}
                 onClick={startFeedbackDictation}
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -1843,12 +1845,12 @@ function App() {
                           type="button"
                           aria-label={key}
                           onFocus={() => setFeedbackKeyboardFocus({ row: rowIndex, col: colIndex })}
+                          onPointerEnter={() => setFeedbackKeyboardFocus({ row: rowIndex, col: colIndex })}
                           onPointerDown={(event) => {
                             event.preventDefault()
                             setFeedbackKeyboardFocus({ row: rowIndex, col: colIndex })
-                            pressFeedbackKeyboardKey(key)
                           }}
-                          onClick={(event) => event.preventDefault()}
+                          onClick={() => pressFeedbackKeyboardKey(key)}
                         >
                           {key}
                         </button>
