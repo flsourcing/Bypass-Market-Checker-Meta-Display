@@ -164,11 +164,6 @@ function App() {
     }
 
     if (screen === 'text-lookup') {
-      if (isDisplayApp) {
-        setTextSearchKeyboardOpen(true)
-        setTextSearchKeyboardFocus({ row: 0, col: 0 })
-      }
-
       window.requestAnimationFrame(() => {
         document.querySelector<HTMLElement>('.text-lookup-input')?.focus()
       })
@@ -858,7 +853,7 @@ function App() {
     setTextSearchMessage('')
     setTextSearchKeyboardShift(false)
     setTextSearchKeyboardNumbers(false)
-    setTextSearchKeyboardOpen(isDisplayApp)
+    setTextSearchKeyboardOpen(false)
     setTextSearchKeyboardFocus({ row: 0, col: 0 })
     setMessage('')
     setScreen('text-lookup')
@@ -1858,105 +1853,122 @@ function App() {
       )}
 
       {screen === 'text-lookup' && (
-        <section className="glass-card text-lookup-screen" aria-label="Text Lookup">
-          <div className="card-header">
-            <div>
-              <p className="eyebrow">Text Lookup</p>
-              <h1>Search by name or SKU</h1>
+        <section
+          className={`glass-card text-lookup-screen ${textSearchKeyboardOpen && isDisplayApp ? 'keyboard-open' : ''}`}
+          aria-label="Text Lookup"
+        >
+          <div className="text-lookup-top">
+            <div className="card-header">
+              <div>
+                <p className="eyebrow">Text Lookup</p>
+                <h1>Search by name or SKU</h1>
+              </div>
+              <button className="text-button" type="button" data-focusable onClick={closeTextLookup}>
+                Back
+              </button>
             </div>
-            <button className="text-button" type="button" data-focusable onClick={closeTextLookup}>
-              Back
-            </button>
+
+            {isDisplayApp && (
+              <p className="feedback-glasses-hint">
+                Tap the search box to open the keyboard. Press Done to hide it, then scroll results below.
+              </p>
+            )}
+
+            <div className="text-lookup-search-wrap">
+              <input
+                className="text-lookup-input"
+                data-focusable
+                autoFocus
+                type="text"
+                inputMode="search"
+                readOnly={isDisplayApp}
+                placeholder="Search product name or SKU"
+                value={textSearchQuery}
+                onFocus={() => {
+                  if (isDisplayApp) {
+                    setTextSearchKeyboardOpen(true)
+                    setTextSearchKeyboardFocus({ row: 0, col: 0 })
+                  }
+                }}
+                onClick={() => {
+                  if (isDisplayApp) {
+                    setTextSearchKeyboardOpen(true)
+                    setTextSearchKeyboardFocus({ row: 0, col: 0 })
+                  }
+                }}
+                onChange={(event) => setTextSearchQuery(event.target.value)}
+              />
+            </div>
+
+            {textSearchMessage && (
+              <p className="feedback-modal-message">{textSearchMessage}</p>
+            )}
           </div>
 
-          {isDisplayApp && (
-            <p className="feedback-glasses-hint">
-              Tap the search box, then use the on-screen keyboard. Select a match to load market prices.
-            </p>
-          )}
-
-          <div className="text-lookup-search-wrap">
-            <input
-              className="text-lookup-input"
-              data-focusable
-              autoFocus
-              type="text"
-              inputMode="search"
-              readOnly={isDisplayApp}
-              placeholder="Search product name or SKU"
-              value={textSearchQuery}
-              onFocus={() => {
-                setTextSearchKeyboardOpen(true)
-                if (isDisplayApp) {
-                  setTextSearchKeyboardFocus({ row: 0, col: 0 })
-                }
-              }}
-              onClick={() => {
-                setTextSearchKeyboardOpen(true)
-                if (isDisplayApp) {
-                  setTextSearchKeyboardFocus({ row: 0, col: 0 })
-                }
-              }}
-              onChange={(event) => setTextSearchQuery(event.target.value)}
-            />
-          </div>
-
-          {textSearchMessage && (
-            <p className="feedback-modal-message">{textSearchMessage}</p>
-          )}
-
-          <div className="catalog-suggestions" data-scrollable data-focusable tabIndex={0}>
+          <div
+            className="text-lookup-results"
+            data-scrollable={isDisplayApp && !textSearchKeyboardOpen ? true : undefined}
+            data-focusable={isDisplayApp && !textSearchKeyboardOpen ? true : undefined}
+            tabIndex={isDisplayApp && !textSearchKeyboardOpen ? 0 : undefined}
+          >
+            {isDisplayApp && !textSearchKeyboardOpen && textSuggestions.length > 0 && (
+              <p className="scroll-hint">Use up/down to scroll matches.</p>
+            )}
             {textSuggestions.length === 0 && textSearchQuery.trim().length >= 2 && !textSearchMessage && (
               <p className="catalog-empty-note">Searching StockX and Alias...</p>
             )}
-            {textSuggestions.map((item) => (
-              <button
-                className="catalog-suggestion-row"
-                key={item.id}
-                type="button"
-                data-focusable
-                disabled={isBusy}
-                onClick={() => void performTextLookup(item)}
-              >
-                {item.imageUrl ? (
-                  <img className="catalog-suggestion-image" src={item.imageUrl} alt="" />
-                ) : (
-                  <div className="catalog-suggestion-image placeholder">?</div>
-                )}
-                <div className="catalog-suggestion-copy">
-                  <strong>{item.name}</strong>
-                  <span>{item.sku}</span>
-                </div>
-              </button>
-            ))}
+            <div className="catalog-suggestions">
+              {textSuggestions.map((item) => (
+                <button
+                  className="catalog-suggestion-row"
+                  key={item.id}
+                  type="button"
+                  data-focusable
+                  disabled={isBusy}
+                  onClick={() => void performTextLookup(item)}
+                >
+                  {item.imageUrl ? (
+                    <img className="catalog-suggestion-image" src={item.imageUrl} alt="" />
+                  ) : (
+                    <div className="catalog-suggestion-image placeholder">?</div>
+                  )}
+                  <div className="catalog-suggestion-copy">
+                    <strong>{item.name}</strong>
+                    <span>{item.sku}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {textSearchKeyboardOpen && (
-            <div className="feedback-keyboard" aria-label="Text search keyboard">
-              {getFeedbackKeyboardRows(textSearchKeyboardNumbers).map((row, rowIndex) => (
-                <div className="feedback-keyboard-row" key={`text-${textSearchKeyboardNumbers ? 'num' : 'alpha'}-${row.join('')}`}>
-                  {row.map((key, colIndex) => {
-                    const isActive = textSearchKeyboardFocus.row === rowIndex
-                      && textSearchKeyboardFocus.col === colIndex
-                    const isWide = FEEDBACK_KEYBOARD_WIDE_KEYS.has(key)
-                    const isShiftActive = key === 'Shift' && textSearchKeyboardShift
+          {isDisplayApp && textSearchKeyboardOpen && (
+            <div className="text-lookup-keyboard-wrap" aria-label="Text search keyboard">
+              <div className="feedback-keyboard">
+                {getFeedbackKeyboardRows(textSearchKeyboardNumbers).map((row, rowIndex) => (
+                  <div className="feedback-keyboard-row" key={`text-${textSearchKeyboardNumbers ? 'num' : 'alpha'}-${row.join('')}`}>
+                    {row.map((key, colIndex) => {
+                      const isActive = textSearchKeyboardFocus.row === rowIndex
+                        && textSearchKeyboardFocus.col === colIndex
+                      const isWide = FEEDBACK_KEYBOARD_WIDE_KEYS.has(key)
+                      const isShiftActive = key === 'Shift' && textSearchKeyboardShift
 
-                    return (
-                      <button
-                        className={`feedback-key ${isActive ? 'active' : ''} ${isWide ? 'wide' : ''} ${isShiftActive ? 'shift-active' : ''}`}
-                        key={`text-${key}`}
-                        type="button"
-                        aria-label={key}
-                        onFocus={() => setTextSearchKeyboardFocus({ row: rowIndex, col: colIndex })}
-                        onPointerUp={() => activateFeedbackTarget(`text:${key}`, () => pressTextSearchKey(key))}
-                        onClick={() => activateFeedbackTarget(`text:${key}`, () => pressTextSearchKey(key))}
-                      >
-                        {getFeedbackKeyLabel(key, textSearchKeyboardShift, textSearchKeyboardNumbers)}
-                      </button>
-                    )
-                  })}
-                </div>
-              ))}
+                      return (
+                        <button
+                          className={`feedback-key ${isActive ? 'active' : ''} ${isWide ? 'wide' : ''} ${isShiftActive ? 'shift-active' : ''}`}
+                          key={`text-${key}`}
+                          type="button"
+                          aria-label={key}
+                          onFocus={() => setTextSearchKeyboardFocus({ row: rowIndex, col: colIndex })}
+                          onPointerUp={() => activateFeedbackTarget(`text:${key}`, () => pressTextSearchKey(key))}
+                          onClick={() => activateFeedbackTarget(`text:${key}`, () => pressTextSearchKey(key))}
+                        >
+                          {getFeedbackKeyLabel(key, textSearchKeyboardShift, textSearchKeyboardNumbers)}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </section>
