@@ -289,6 +289,14 @@ export async function getImageLookup(token: string, lookupId: string) {
   })
 }
 
+export async function listLookupHistory(token: string, limit = 50) {
+  const params = new URLSearchParams({ limit: String(limit) })
+
+  return apiRequest<{ lookups: ImageLookup[] }>(`/lookups/history/list?${params.toString()}`, {
+    token,
+  })
+}
+
 export async function submitLookupFeedback(
   token: string,
   lookupId: string,

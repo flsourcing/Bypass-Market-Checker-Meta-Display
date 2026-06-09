@@ -18,6 +18,7 @@ import {
   getApiKeys,
   getDevicePairing,
   getImageLookup,
+  listLookupHistory,
   getMe,
   getPairedDevices,
   getStockXIntegration,
@@ -48,7 +49,7 @@ import type {
   User,
 } from './api'
 
-type Screen = 'auth' | 'home' | 'settings' | 'lookup' | 'text-lookup'
+type Screen = 'auth' | 'home' | 'settings' | 'lookup' | 'text-lookup' | 'lookup-history'
 type AuthMode = 'login' | 'register'
 type LookupKind = 'image' | 'barcode'
 
@@ -129,6 +130,12 @@ function App() {
   const [textSearchKeyboardShift, setTextSearchKeyboardShift] = useState(false)
   const [textSearchKeyboardNumbers, setTextSearchKeyboardNumbers] = useState(false)
   const [textSearchMessage, setTextSearchMessage] = useState('')
+  const [displayMenuOpen, setDisplayMenuOpen] = useState(false)
+  const [historyLookups, setHistoryLookups] = useState<ImageLookup[]>([])
+  const [historyDetailLookup, setHistoryDetailLookup] = useState<ImageLookup | null>(null)
+  const [historyDetailImageUrl, setHistoryDetailImageUrl] = useState<string | null>(null)
+  const [historyThumbnailUrls, setHistoryThumbnailUrls] = useState<Record<string, string>>({})
+  const [historyMessage, setHistoryMessage] = useState('')
 
   useEffect(() => {
     feedbackKeyboardShiftRef.current = feedbackKeyboardShift
@@ -341,6 +348,29 @@ function App() {
     textSearchKeyboardOpen,
     textSearchKeyboardNumbers,
   ])
+
+  useEffect(() => {
+    if (!token || screen !== 'lookup-history' || !historyDetailLookup) {
+      return
+    }
+
+    if (historyDetailLookup.marketStatus !== 'loading') {
+      return
+    }
+
+    const interval = window.setInterval(() => {
+      void getImageLookup(token, historyDetailLookup.id)
+        .then(({ lookup }) => {
+          setHistoryDetailLookup(lookup)
+          setHistoryLookups((items) => items.map((item) => (
+            item.id === lookup.id ? lookup : item
+          )))
+        })
+        .catch(() => {})
+    }, 500)
+
+    return () => window.clearInterval(interval)
+  }, [historyDetailLookup?.id, historyDetailLookup?.marketStatus, screen, token])
 
   useEffect(() => {
     if (screen !== 'text-lookup' || !token) {
@@ -577,13 +607,180 @@ function App() {
   }
 
   function goDisplayHome() {
-    if (screen === 'settings') {
+    setDisplayMenuOpen(false)
+
+    if (screen === 'settings' || screen === 'text-lookup' || screen === 'lookup-history') {
+      setHistoryDetailLookup(null)
+      setHistoryDetailImageUrl(null)
       setScreen('home')
       setMessage('')
       return
     }
 
     resetDisplayLookup()
+  }
+
+  function openDisplaySettings() {
+    setDisplayMenuOpen(false)
+    setMessage('')
+    setScreen('settings')
+  }
+
+  function lookupSourceLabel(currentLookup: ImageLookup) {
+    if (currentLookup.lookupType === 'text' || currentLookup.captureMode === 'text') {
+      return 'Text search'
+    }
+
+    if (currentLookup.captureMode === 'mobile') {
+      return 'Mobile search'
+    }
+
+    return 'Meta Glasses'
+  }
+
+  function summarizeHistoryEntry(currentLookup: ImageLookup) {
+    if (currentLookup.status === 'error') {
+      return {
+        title: currentLookup.error ?? 'Lookup failed',
+        detail: currentLookup.lookupType === 'barcode' ? 'Barcode lookup error' : 'Lookup error',
+      }
+    }
+
+    if (currentLookup.lookupType === 'barcode') {
+      const upc = currentLookup.result?.upc?.trim()
+        ?? currentLookup.result?.sku?.trim()
+      return {
+        title: upc ? `UPC ${upc}` : 'No UPC found',
+        detail: barcodeDetectionMethod(currentLookup.result?.notes),
+      }
+    }
+
+    if (currentLookup.lookupType === 'text') {
+      const sku = currentLookup.result?.sku?.trim() ?? ''
+      const name = lookupProductName(currentLookup)
+      return {
+        title: sku ? `SKU ${sku}` : name,
+        detail: name || 'Text search',
+      }
+    }
+
+    const sku = currentLookup.result?.sku?.trim() ?? ''
+    const name = lookupProductName(currentLookup)
+    if (sku) {
+      const accuracy = currentLookup.result?.confidence
+        ? `${Math.round(currentLookup.result.confidence)}% accurate`
+        : ''
+      const detail = [name, accuracy].filter(Boolean).join(' · ')
+      return {
+        title: `SKU ${sku}`,
+        detail: detail || 'Gemini image lookup',
+      }
+    }
+
+    return {
+      title: 'SKU Not found',
+      detail: name || currentLookup.result?.notes || 'Gemini image lookup',
+    }
+  }
+
+  function historyThumbnailSrc(currentLookup: ImageLookup) {
+    return historyThumbnailUrls[currentLookup.id]
+      ?? currentLookup.catalogImageUrl
+      ?? null
+  }
+
+  async function loadHistoryThumbnails(lookups: ImageLookup[]) {
+    if (!token) {
+      return
+    }
+
+    const thumbnailEntries = await Promise.all(lookups.map(async (entry) => {
+      if (entry.catalogImageUrl) {
+        return [entry.id, entry.catalogImageUrl] as const
+      }
+
+      if (!entry.imageUrl) {
+        return null
+      }
+
+      try {
+        const blob = await fetchLookupImageBlob(token, entry.id)
+        return [entry.id, URL.createObjectURL(blob)] as const
+      } catch {
+        return null
+      }
+    }))
+
+    const nextThumbnails: Record<string, string> = {}
+    for (const entry of thumbnailEntries) {
+      if (entry) {
+        nextThumbnails[entry[0]] = entry[1]
+      }
+    }
+
+    setHistoryThumbnailUrls((current) => ({ ...current, ...nextThumbnails }))
+  }
+
+  async function openLookupHistory() {
+    if (!token) {
+      setMessage('Log in before opening lookup history.')
+      return
+    }
+
+    setIsBusy(true)
+    setHistoryMessage('')
+    setDisplayMenuOpen(false)
+
+    try {
+      const { lookups } = await listLookupHistory(token)
+      setHistoryLookups(lookups)
+      setHistoryDetailLookup(null)
+      setHistoryDetailImageUrl(null)
+      setScreen('lookup-history')
+      void loadHistoryThumbnails(lookups)
+    } catch (error) {
+      setHistoryMessage(error instanceof Error ? error.message : 'Could not load lookup history')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function openHistoryDetail(entry: ImageLookup) {
+    if (!token) {
+      return
+    }
+
+    setIsBusy(true)
+    setHistoryMessage('')
+
+    try {
+      const { lookup: detailedLookup } = await getImageLookup(token, entry.id)
+      setHistoryDetailLookup(detailedLookup)
+
+      if (detailedLookup.imagePreview) {
+        setHistoryDetailImageUrl(null)
+      } else if (detailedLookup.catalogImageUrl) {
+        setHistoryDetailImageUrl(detailedLookup.catalogImageUrl)
+      } else if (detailedLookup.imageUrl) {
+        const blob = await fetchLookupImageBlob(token, detailedLookup.id)
+        setHistoryDetailImageUrl(URL.createObjectURL(blob))
+      } else {
+        setHistoryDetailImageUrl(null)
+      }
+    } catch (error) {
+      setHistoryMessage(error instanceof Error ? error.message : 'Could not open lookup detail')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  function closeHistoryDetail() {
+    if (historyDetailImageUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(historyDetailImageUrl)
+    }
+
+    setHistoryDetailLookup(null)
+    setHistoryDetailImageUrl(null)
   }
 
   function syncActiveLookupKind(currentLookup: ImageLookup) {
@@ -723,6 +920,12 @@ function App() {
     setLookup((visibleLookup) => (
       visibleLookup?.id === currentLookup.id ? optimisticLookup : visibleLookup
     ))
+    setHistoryLookups((items) => items.map((item) => (
+      item.id === currentLookup.id ? optimisticLookup : item
+    )))
+    setHistoryDetailLookup((detail) => (
+      detail?.id === currentLookup.id ? optimisticLookup : detail
+    ))
     setFeedbackLookup(null)
     setFeedbackNote('')
     setFeedbackKeyboardOpen(false)
@@ -735,16 +938,20 @@ function App() {
         status,
         note,
       )
-      setLookup((visibleLookup) => {
-        if (visibleLookup?.id !== currentLookup.id) {
-          return visibleLookup
-        }
+      const mergedLookup = updatedLookup.feedback ? updatedLookup : {
+        ...updatedLookup,
+        feedback: optimisticLookup.feedback,
+      }
 
-        return updatedLookup.feedback ? updatedLookup : {
-          ...updatedLookup,
-          feedback: optimisticLookup.feedback,
-        }
-      })
+      setLookup((visibleLookup) => (
+        visibleLookup?.id === currentLookup.id ? mergedLookup : visibleLookup
+      ))
+      setHistoryLookups((items) => items.map((item) => (
+        item.id === currentLookup.id ? mergedLookup : item
+      )))
+      setHistoryDetailLookup((detail) => (
+        detail?.id === currentLookup.id ? mergedLookup : detail
+      ))
       setMessage(status === 'correct' ? 'Marked correct.' : 'Marked incorrect. Thanks for helping improve results.')
       if (status === 'correct') {
         triggerConfetti()
@@ -752,6 +959,12 @@ function App() {
     } catch (error) {
       setLookup((visibleLookup) => (
         visibleLookup?.id === currentLookup.id ? currentLookup : visibleLookup
+      ))
+      setHistoryLookups((items) => items.map((item) => (
+        item.id === currentLookup.id ? currentLookup : item
+      )))
+      setHistoryDetailLookup((detail) => (
+        detail?.id === currentLookup.id ? currentLookup : detail
       ))
       setMessage(error instanceof Error ? error.message : 'Could not save feedback')
     }
@@ -850,6 +1063,7 @@ function App() {
   }
 
   function openTextLookup() {
+    setDisplayMenuOpen(false)
     setTextSearchQuery('')
     setTextSuggestions([])
     setTextSearchMessage('')
@@ -1042,8 +1256,12 @@ function App() {
     }
   }
 
-  function renderLookupDetailCard(currentLookup: ImageLookup, className = 'lookup-detail-card') {
-    const imageSrc = lookupImageSrc(currentLookup)
+  function renderLookupDetailCard(
+    currentLookup: ImageLookup,
+    className = 'lookup-detail-card',
+    options?: { imageSrc?: string | null },
+  ) {
+    const imageSrc = options?.imageSrc ?? lookupImageSrc(currentLookup)
     const isBarcode = currentLookup.lookupType === 'barcode'
     const isText = currentLookup.lookupType === 'text'
     const catalogImage = currentLookup.catalogImageUrl ?? null
@@ -1661,18 +1879,48 @@ function App() {
   return (
     <main className={`app-shell ${isDisplayApp ? 'display-app-shell' : ''}`}>
       {screen !== 'auth' && isDisplayApp && (
-        <button
-          className="home-button"
-          type="button"
-          aria-label="Home"
-          data-focusable
-          onClick={goDisplayHome}
-        >
-          Home
-        </button>
+        <div className="display-menu-wrap">
+          <button
+            className="display-menu-button"
+            type="button"
+            aria-label="Menu"
+            aria-expanded={displayMenuOpen}
+            data-focusable
+            onClick={() => setDisplayMenuOpen((open) => !open)}
+          >
+            <span className="display-menu-icon" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </button>
+
+          {displayMenuOpen && (
+            <div className="display-menu-panel" role="menu" aria-label="Display menu">
+              <button
+                className="display-menu-item"
+                type="button"
+                role="menuitem"
+                data-focusable
+                onClick={goDisplayHome}
+              >
+                Home
+              </button>
+              <button
+                className="display-menu-item"
+                type="button"
+                role="menuitem"
+                data-focusable
+                onClick={openDisplaySettings}
+              >
+                Settings
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
-      {screen !== 'auth' && (
+      {screen !== 'auth' && !isDisplayApp && (
         <button
           className="settings-button"
           type="button"
@@ -1816,7 +2064,7 @@ function App() {
             </>
           ) : (
             <>
-              <section className="lookup-panel">
+              <section className={isDisplayApp ? 'lookup-actions-grid display-lookup-grid' : 'lookup-panel'}>
                 <button
                   className="lookup-button"
                   type="button"
@@ -1850,6 +2098,18 @@ function App() {
                 >
                   Text Lookup
                 </button>
+
+                {isDisplayApp && (
+                  <button
+                    className="lookup-button"
+                    type="button"
+                    data-focusable
+                    onClick={() => void openLookupHistory()}
+                    disabled={isBusy}
+                  >
+                    Lookup History
+                  </button>
+                )}
               </section>
               {(needsKeyMessage || message) && (
                 <p className="center-message">{message || needsKeyMessage}</p>
@@ -1974,6 +2234,119 @@ function App() {
                 </div>
               ))}
             </div>
+          )}
+        </section>
+      )}
+
+      {screen === 'lookup-history' && (
+        <section className="glass-card lookup-history-screen" aria-label="Lookup History">
+          {historyDetailLookup ? (
+            <>
+              <div className="card-header">
+                <div>
+                  <p className="eyebrow">Lookup History</p>
+                  <h1>Lookup Detail</h1>
+                </div>
+                <button className="text-button" type="button" data-focusable onClick={closeHistoryDetail}>
+                  Back
+                </button>
+              </div>
+
+              {renderLookupDetailCard(historyDetailLookup, 'lookup-detail-card history-detail-card', {
+                imageSrc: historyDetailLookup.imagePreview
+                  ?? historyDetailImageUrl
+                  ?? historyDetailLookup.catalogImageUrl,
+              })}
+            </>
+          ) : (
+            <>
+              <div className="card-header">
+                <div>
+                  <p className="eyebrow">Lookup History</p>
+                  <h1>Recent lookups</h1>
+                </div>
+                <button className="text-button" type="button" data-focusable onClick={goDisplayHome}>
+                  Back
+                </button>
+              </div>
+
+              {isDisplayApp && <p className="scroll-hint">Use up/down to scroll history.</p>}
+
+              {historyMessage && (
+                <p className="feedback-modal-message">{historyMessage}</p>
+              )}
+
+              {historyLookups.length === 0 ? (
+                <p className="catalog-empty-note">No lookups yet.</p>
+              ) : (
+                <div className="lookup-history-list" data-scrollable data-focusable tabIndex={0}>
+                  {historyLookups.map((entry) => {
+                    const summary = summarizeHistoryEntry(entry)
+                    const thumbnail = historyThumbnailSrc(entry)
+
+                    return (
+                      <article className="lookup-history-row" key={entry.id}>
+                        <button
+                          className="lookup-history-row-main"
+                          type="button"
+                          data-focusable
+                          onClick={() => void openHistoryDetail(entry)}
+                        >
+                          {thumbnail ? (
+                            <img className="lookup-history-thumb" src={thumbnail} alt="" />
+                          ) : (
+                            <div className="lookup-history-thumb placeholder">?</div>
+                          )}
+
+                          <div className="lookup-history-copy">
+                            <span className="lookup-history-source">{lookupSourceLabel(entry)}</span>
+                            <strong>{summary.title}</strong>
+                            {summary.detail && <span>{summary.detail}</span>}
+                            <span className="lookup-history-date">
+                              {formatLookupDate(entry.updatedAt || entry.createdAt)}
+                            </span>
+                            {entry.marketData && entry.marketData.combined.length > 0 && (
+                              <span className="lookup-history-market-note">StockX · Alias market loaded</span>
+                            )}
+                          </div>
+                        </button>
+
+                        <div className="lookup-history-feedback">
+                          {entry.feedback ? (
+                            <div className={`history-feedback-badge ${entry.feedback.status}`}>
+                              <strong>{entry.feedback.status === 'correct' ? 'Correct' : 'Incorrect'}</strong>
+                              {entry.feedback.status === 'incorrect' && entry.feedback.correction && (
+                                <span>{entry.feedback.correction}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <>
+                              <span className="history-feedback-label">Needs feedback</span>
+                              <button
+                                className="mini-button history-feedback-correct"
+                                type="button"
+                                data-focusable
+                                onClick={() => void saveLookupFeedback(entry, 'correct')}
+                              >
+                                Correct
+                              </button>
+                              <button
+                                className="mini-button history-feedback-incorrect"
+                                type="button"
+                                data-focusable
+                                onClick={() => openIncorrectFeedback(entry)}
+                              >
+                                Incorrect
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              )}
+            </>
           )}
         </section>
       )}
