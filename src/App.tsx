@@ -100,6 +100,7 @@ function App() {
   const [feedbackNote, setFeedbackNote] = useState('')
   const [feedbackKeyboardOpen, setFeedbackKeyboardOpen] = useState(false)
   const [feedbackKeyboardFocus, setFeedbackKeyboardFocus] = useState({ row: 0, col: 0 })
+  const [feedbackModalMessage, setFeedbackModalMessage] = useState('')
   const [isListeningForFeedback, setIsListeningForFeedback] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
@@ -115,6 +116,18 @@ function App() {
   const [stockxClientSecret, setStockxClientSecret] = useState('')
 
   useEffect(() => {
+    if (feedbackLookup) {
+      if (isDisplayApp) {
+        setFeedbackKeyboardOpen(true)
+        setFeedbackKeyboardFocus({ row: 0, col: 0 })
+      }
+
+      window.requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>('.feedback-modal input')?.focus()
+      })
+      return
+    }
+
     if (
       isDisplayApp
       && displayCaptureArmed
@@ -126,11 +139,13 @@ function App() {
 
     const firstFocusable = document.querySelector<HTMLElement>('[data-focusable]')
     firstFocusable?.focus()
-  }, [screen, authMode, lookup?.status, isDisplayApp, displayCaptureArmed])
+  }, [screen, authMode, lookup?.status, isDisplayApp, displayCaptureArmed, feedbackLookup])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (feedbackKeyboardOpen && feedbackLookup) {
+      const feedbackInputActive = Boolean(feedbackKeyboardOpen && feedbackLookup)
+
+      if (feedbackInputActive) {
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
           event.preventDefault()
           setFeedbackKeyboardFocus((current) => {
@@ -199,8 +214,11 @@ function App() {
         }
       }
 
+      const focusableSelector = feedbackLookup
+        ? '.feedback-modal [data-focusable]'
+        : '[data-focusable]'
       const focusableElements = Array.from(
-        document.querySelectorAll<HTMLElement>('[data-focusable]'),
+        document.querySelectorAll<HTMLElement>(focusableSelector),
       )
       const currentIndex = focusableElements.findIndex((element) => element === document.activeElement)
 
@@ -228,7 +246,7 @@ function App() {
     window.addEventListener('keydown', handleKeyDown)
 
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [feedbackKeyboardFocus, feedbackKeyboardOpen, feedbackLookup])
+  }, [feedbackKeyboardFocus, feedbackKeyboardOpen, feedbackLookup, isDisplayApp])
 
   useEffect(() => {
     if (!token) {
@@ -617,18 +635,22 @@ function App() {
 
     setFeedbackLookup(currentLookup)
     setFeedbackNote('')
-    setFeedbackKeyboardOpen(false)
+    setFeedbackModalMessage('')
+    setFeedbackKeyboardOpen(isDisplayApp)
     setFeedbackKeyboardFocus({ row: 0, col: 0 })
   }
 
   function closeIncorrectFeedback() {
     setFeedbackLookup(null)
     setFeedbackNote('')
+    setFeedbackModalMessage('')
     setFeedbackKeyboardOpen(false)
     setIsListeningForFeedback(false)
   }
 
   function pressFeedbackKeyboardKey(key: string) {
+    setFeedbackModalMessage('')
+
     if (key === 'Backspace') {
       setFeedbackNote((current) => current.slice(0, -1))
       return
@@ -672,7 +694,7 @@ function App() {
     const SpeechRecognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition
 
     if (!SpeechRecognition) {
-      setMessage('Microphone dictation is not available in this glasses browser. Use the iPhone note input for voice.')
+      setFeedbackModalMessage('Voice input is not available on glasses. Use the on-screen keyboard below.')
       return
     }
 
@@ -685,18 +707,20 @@ function App() {
         const transcript = event.results[0]?.[0]?.transcript.trim()
         if (transcript) {
           setFeedbackNote((current) => [current.trim(), transcript].filter(Boolean).join(' '))
+          setFeedbackModalMessage('')
         }
       }
       recognition.onerror = () => {
         setIsListeningForFeedback(false)
-        setMessage('Could not access microphone here. Use the iPhone note input for voice.')
+        setFeedbackModalMessage('Could not access the microphone here. Use the on-screen keyboard below.')
       }
       recognition.onend = () => setIsListeningForFeedback(false)
+      setFeedbackModalMessage('')
       setIsListeningForFeedback(true)
       recognition.start()
     } catch {
       setIsListeningForFeedback(false)
-      setMessage('Microphone access was blocked here. Use the iPhone note input for voice.')
+      setFeedbackModalMessage('Microphone access was blocked. Use the on-screen keyboard below.')
     }
   }
 
@@ -1809,16 +1833,32 @@ function App() {
             <p>
               Optional: tell us what was wrong with the result. Notes help our systems get better over time.
             </p>
+            {isDisplayApp && (
+              <p className="feedback-glasses-hint">
+                Use arrow keys to move, select to type. Arrow up from the top row reaches the microphone.
+              </p>
+            )}
             <div className="feedback-input-wrap">
               <input
                 data-focusable
                 autoFocus
                 type="text"
                 inputMode="text"
+                readOnly={isDisplayApp}
                 placeholder="Optional note"
                 value={feedbackNote}
-                onFocus={() => setFeedbackKeyboardOpen(true)}
-                onClick={() => setFeedbackKeyboardOpen(true)}
+                onFocus={() => {
+                  setFeedbackKeyboardOpen(true)
+                  if (isDisplayApp) {
+                    setFeedbackKeyboardFocus({ row: 0, col: 0 })
+                  }
+                }}
+                onClick={() => {
+                  setFeedbackKeyboardOpen(true)
+                  if (isDisplayApp) {
+                    setFeedbackKeyboardFocus({ row: 0, col: 0 })
+                  }
+                }}
                 onChange={(event) => setFeedbackNote(event.target.value)}
               />
               <button
@@ -1845,6 +1885,9 @@ function App() {
             </div>
             {isListeningForFeedback && (
               <p className="feedback-listening-note">Listening...</p>
+            )}
+            {feedbackModalMessage && (
+              <p className="feedback-modal-message">{feedbackModalMessage}</p>
             )}
             {feedbackKeyboardOpen && (
               <div className="feedback-keyboard" aria-label="Feedback note keyboard">
