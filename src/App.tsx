@@ -164,11 +164,6 @@ function App() {
     }
 
     if (screen === 'text-lookup') {
-      if (isDisplayApp) {
-        setTextSearchKeyboardOpen(true)
-        setTextSearchKeyboardFocus({ row: 0, col: 0 })
-      }
-
       window.requestAnimationFrame(() => {
         document.querySelector<HTMLElement>('.text-lookup-input')?.focus()
       })
@@ -302,7 +297,9 @@ function App() {
       const focusableSelector = feedbackLookup
         ? '.feedback-modal [data-focusable]'
         : screen === 'text-lookup'
-          ? '.text-lookup-screen [data-focusable]'
+          ? (textSearchKeyboardOpen && isDisplayApp
+            ? '.text-lookup-screen .text-lookup-toolbar [data-focusable], .text-lookup-screen .text-lookup-keyboard [data-focusable]'
+            : '.text-lookup-screen [data-focusable]')
           : '[data-focusable]'
       const focusableElements = Array.from(
         document.querySelectorAll<HTMLElement>(focusableSelector),
@@ -907,6 +904,11 @@ function App() {
 
     if (key === 'Done') {
       setTextSearchKeyboardOpen(false)
+      if (isDisplayApp) {
+        window.requestAnimationFrame(() => {
+          document.querySelector<HTMLElement>('.text-lookup-results')?.focus()
+        })
+      }
       return
     }
 
@@ -1859,55 +1861,68 @@ function App() {
 
       {screen === 'text-lookup' && (
         <section className="glass-card text-lookup-screen" aria-label="Text Lookup">
-          <div className="card-header">
-            <div>
-              <p className="eyebrow">Text Lookup</p>
-              <h1>Search by name or SKU</h1>
+          <div className="text-lookup-toolbar">
+            <div className="card-header">
+              <div>
+                <p className="eyebrow">Text Lookup</p>
+                <h1>Search by name or SKU</h1>
+              </div>
+              <button className="text-button" type="button" data-focusable onClick={closeTextLookup}>
+                Back
+              </button>
             </div>
-            <button className="text-button" type="button" data-focusable onClick={closeTextLookup}>
-              Back
-            </button>
+
+            {isDisplayApp && (
+              <p className="feedback-glasses-hint">
+                {textSearchKeyboardOpen
+                  ? 'Type with the keyboard below. Tap Done to browse matches, then tap the search box to type again.'
+                  : 'Scroll matches below or tap the search box to open the keyboard.'}
+              </p>
+            )}
+
+            <div className="text-lookup-search-wrap">
+              <input
+                className="text-lookup-input"
+                data-focusable
+                autoFocus
+                type="text"
+                inputMode="search"
+                readOnly={isDisplayApp}
+                placeholder="Search product name or SKU"
+                value={textSearchQuery}
+                onFocus={() => {
+                  if (isDisplayApp) {
+                    setTextSearchKeyboardOpen(true)
+                    setTextSearchKeyboardFocus({ row: 0, col: 0 })
+                  }
+                }}
+                onClick={() => {
+                  if (isDisplayApp) {
+                    setTextSearchKeyboardOpen(true)
+                    setTextSearchKeyboardFocus({ row: 0, col: 0 })
+                  }
+                }}
+                onChange={(event) => setTextSearchQuery(event.target.value)}
+              />
+            </div>
+
+            {textSearchMessage && (
+              <p className="feedback-modal-message">{textSearchMessage}</p>
+            )}
           </div>
 
-          {isDisplayApp && (
-            <p className="feedback-glasses-hint">
-              Tap the search box, then use the on-screen keyboard. Select a match to load market prices.
-            </p>
-          )}
-
-          <div className="text-lookup-search-wrap">
-            <input
-              className="text-lookup-input"
-              data-focusable
-              autoFocus
-              type="text"
-              inputMode="search"
-              readOnly={isDisplayApp}
-              placeholder="Search product name or SKU"
-              value={textSearchQuery}
-              onFocus={() => {
-                setTextSearchKeyboardOpen(true)
-                if (isDisplayApp) {
-                  setTextSearchKeyboardFocus({ row: 0, col: 0 })
-                }
-              }}
-              onClick={() => {
-                setTextSearchKeyboardOpen(true)
-                if (isDisplayApp) {
-                  setTextSearchKeyboardFocus({ row: 0, col: 0 })
-                }
-              }}
-              onChange={(event) => setTextSearchQuery(event.target.value)}
-            />
-          </div>
-
-          {textSearchMessage && (
-            <p className="feedback-modal-message">{textSearchMessage}</p>
-          )}
-
-          <div className="catalog-suggestions" data-scrollable data-focusable tabIndex={0}>
+          <div
+            className={`text-lookup-results catalog-suggestions ${isDisplayApp && textSearchKeyboardOpen ? 'is-hidden' : ''}`}
+            data-scrollable
+            data-focusable
+            tabIndex={0}
+            aria-hidden={isDisplayApp && textSearchKeyboardOpen}
+          >
             {textSuggestions.length === 0 && textSearchQuery.trim().length >= 2 && !textSearchMessage && (
               <p className="catalog-empty-note">Searching StockX and Alias...</p>
+            )}
+            {isDisplayApp && !textSearchKeyboardOpen && textSuggestions.length > 0 && (
+              <p className="scroll-hint">Use up/down to scroll matches.</p>
             )}
             {textSuggestions.map((item) => (
               <button
@@ -1932,7 +1947,7 @@ function App() {
           </div>
 
           {textSearchKeyboardOpen && (
-            <div className="feedback-keyboard" aria-label="Text search keyboard">
+            <div className="feedback-keyboard text-lookup-keyboard" aria-label="Text search keyboard">
               {getFeedbackKeyboardRows(textSearchKeyboardNumbers).map((row, rowIndex) => (
                 <div className="feedback-keyboard-row" key={`text-${textSearchKeyboardNumbers ? 'num' : 'alpha'}-${row.join('')}`}>
                   {row.map((key, colIndex) => {
@@ -1946,6 +1961,7 @@ function App() {
                         className={`feedback-key ${isActive ? 'active' : ''} ${isWide ? 'wide' : ''} ${isShiftActive ? 'shift-active' : ''}`}
                         key={`text-${key}`}
                         type="button"
+                        data-focusable
                         aria-label={key}
                         onFocus={() => setTextSearchKeyboardFocus({ row: rowIndex, col: colIndex })}
                         onPointerUp={() => activateFeedbackTarget(`text:${key}`, () => pressTextSearchKey(key))}

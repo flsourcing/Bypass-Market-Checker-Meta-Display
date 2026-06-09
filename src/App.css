@@ -325,15 +325,22 @@
   flex-wrap: wrap;
 }
 
-.text-lookup-screen {
+.glass-card.text-lookup-screen {
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-  max-height: calc(100vh - 48px);
+  max-height: calc(100svh - 48px);
   overflow: hidden;
 }
 
+.text-lookup-toolbar {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 14px;
+}
+
 .text-lookup-search-wrap {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 2;
 }
 
@@ -342,11 +349,25 @@
   box-sizing: border-box;
 }
 
+.text-lookup-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.text-lookup-results.is-hidden {
+  display: none;
+}
+
+.text-lookup-keyboard {
+  flex: 0 0 auto;
+  margin-top: auto;
+}
+
 .catalog-suggestions {
   display: grid;
   gap: 10px;
-  max-height: 42vh;
-  overflow-y: auto;
   padding-right: 4px;
 }
 
