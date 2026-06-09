@@ -129,7 +129,6 @@ export type ImageLookup = {
 
 export type CatalogSearchItem = {
   id: string
-  source: 'stockx' | 'alias'
   name: string
   sku: string
   brand: string
@@ -343,7 +342,7 @@ export async function searchCatalog(token: string, query: string, limit = 10) {
 
 export async function createTextLookup(
   token: string,
-  item: Pick<CatalogSearchItem, 'sku' | 'name' | 'brand' | 'imageUrl' | 'source'>,
+  item: Pick<CatalogSearchItem, 'sku' | 'name' | 'brand' | 'imageUrl'>,
 ) {
   return apiRequest<{ lookup: ImageLookup }>('/lookups/text', {
     method: 'POST',

@@ -940,7 +940,6 @@ function App() {
         name: item.name,
         brand: item.brand,
         imageUrl: item.imageUrl,
-        source: item.source,
       })
       setLookup(createdLookup)
       setActiveLookupKind(null)
@@ -1913,7 +1912,7 @@ function App() {
             {textSuggestions.map((item) => (
               <button
                 className="catalog-suggestion-row"
-                key={`${item.source}-${item.id}`}
+                key={item.id}
                 type="button"
                 data-focusable
                 disabled={isBusy}
@@ -1922,12 +1921,11 @@ function App() {
                 {item.imageUrl ? (
                   <img className="catalog-suggestion-image" src={item.imageUrl} alt="" />
                 ) : (
-                  <div className="catalog-suggestion-image placeholder">{item.source === 'stockx' ? 'SX' : 'AL'}</div>
+                  <div className="catalog-suggestion-image placeholder">?</div>
                 )}
                 <div className="catalog-suggestion-copy">
                   <strong>{item.name}</strong>
                   <span>{item.sku}</span>
-                  <span className="catalog-suggestion-source">{item.source === 'stockx' ? 'StockX' : 'Alias'}</span>
                 </div>
               </button>
             ))}
