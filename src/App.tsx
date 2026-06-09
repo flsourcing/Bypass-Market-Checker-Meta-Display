@@ -133,6 +133,16 @@ function App() {
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
           event.preventDefault()
           setFeedbackKeyboardFocus((current) => {
+            if (current.row === -1) {
+              return event.key === 'ArrowDown'
+                ? { row: 0, col: Math.min(current.col, FEEDBACK_KEYBOARD_ROWS[0].length - 1) }
+                : { row: FEEDBACK_KEYBOARD_ROWS.length - 1, col: 0 }
+            }
+
+            if (event.key === 'ArrowUp' && current.row === 0) {
+              return { row: -1, col: 0 }
+            }
+
             const direction = event.key === 'ArrowDown' ? 1 : -1
             const nextRow = (current.row + direction + FEEDBACK_KEYBOARD_ROWS.length) % FEEDBACK_KEYBOARD_ROWS.length
             const nextCol = Math.min(current.col, FEEDBACK_KEYBOARD_ROWS[nextRow].length - 1)
@@ -144,6 +154,10 @@ function App() {
         if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
           event.preventDefault()
           setFeedbackKeyboardFocus((current) => {
+            if (current.row === -1) {
+              return current
+            }
+
             const rowLength = FEEDBACK_KEYBOARD_ROWS[current.row].length
             const direction = event.key === 'ArrowRight' ? 1 : -1
             const nextCol = (current.col + direction + rowLength) % rowLength
@@ -154,6 +168,11 @@ function App() {
 
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
+          if (feedbackKeyboardFocus.row === -1) {
+            startFeedbackDictation()
+            return
+          }
+
           const key = FEEDBACK_KEYBOARD_ROWS[feedbackKeyboardFocus.row]?.[feedbackKeyboardFocus.col]
           if (key) {
             pressFeedbackKeyboardKey(key)
@@ -1790,10 +1809,11 @@ function App() {
                 onChange={(event) => setFeedbackNote(event.target.value)}
               />
               <button
-                className={`feedback-mic-button ${isListeningForFeedback ? 'listening' : ''}`}
+                className={`feedback-mic-button ${isListeningForFeedback ? 'listening' : ''} ${feedbackKeyboardFocus.row === -1 ? 'active' : ''}`}
                 type="button"
                 data-focusable
                 aria-label="Dictate incorrect feedback note"
+                onFocus={() => setFeedbackKeyboardFocus({ row: -1, col: 0 })}
                 onClick={startFeedbackDictation}
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -1822,7 +1842,13 @@ function App() {
                           key={key}
                           type="button"
                           aria-label={key}
-                          onClick={() => pressFeedbackKeyboardKey(key)}
+                          onFocus={() => setFeedbackKeyboardFocus({ row: rowIndex, col: colIndex })}
+                          onPointerDown={(event) => {
+                            event.preventDefault()
+                            setFeedbackKeyboardFocus({ row: rowIndex, col: colIndex })
+                            pressFeedbackKeyboardKey(key)
+                          }}
+                          onClick={(event) => event.preventDefault()}
                         >
                           {key}
                         </button>

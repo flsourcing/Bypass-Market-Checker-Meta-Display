@@ -230,6 +230,15 @@
   stroke-linejoin: round;
 }
 
+.feedback-mic-button.active,
+.feedback-mic-button:focus-visible,
+.feedback-mic-button:hover {
+  outline: none;
+  border-color: rgba(98, 210, 255, 0.95);
+  background: rgba(98, 210, 255, 0.26);
+  box-shadow: 0 0 0 4px rgba(98, 210, 255, 0.17);
+}
+
 .feedback-mic-button.listening {
   border-color: rgba(82, 255, 151, 0.72);
   background: rgba(82, 255, 151, 0.22);
