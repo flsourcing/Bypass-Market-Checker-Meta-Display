@@ -67,6 +67,8 @@ function App() {
   const [captureSessionActive, setCaptureSessionActive] = useState(false)
   const [devicePairing, setDevicePairing] = useState<DevicePairing | null>(null)
   const [message, setMessage] = useState('')
+  const [feedbackLookup, setFeedbackLookup] = useState<ImageLookup | null>(null)
+  const [feedbackNote, setFeedbackNote] = useState('')
   const [showConfetti, setShowConfetti] = useState(false)
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
@@ -260,12 +262,16 @@ function App() {
       && !lookupImageObjectUrl
     const waitingForMarket = lookup.status === 'complete'
       && lookup.marketStatus === 'loading'
+    const waitingForFeedback = isDisplayApp
+      && lookup.status === 'complete'
+      && !lookup.feedback
 
     if (
       lookup.status !== 'pending'
       && lookup.status !== 'processing'
       && !waitingForImage
       && !waitingForMarket
+      && !waitingForFeedback
     ) {
       return
     }
@@ -281,11 +287,15 @@ function App() {
           ) {
             setCaptureSessionActive(false)
           }
+          if (latestLookup.feedback) {
+            setFeedbackLookup(null)
+            setFeedbackNote('')
+          }
         })
         .catch((error: unknown) => {
           setMessage(error instanceof Error ? error.message : 'Unable to check lookup status')
         })
-    }, isDisplayApp && (captureSessionActive || lookup.status === 'processing' || waitingForImage || waitingForMarket) ? 500 : isDisplayApp ? 1200 : 3000)
+    }, isDisplayApp && (captureSessionActive || lookup.status === 'processing' || waitingForImage || waitingForMarket || waitingForFeedback) ? 500 : isDisplayApp ? 1200 : 3000)
 
     return () => window.clearInterval(interval)
   }, [captureSessionActive, isDisplayApp, lookup, lookupImageObjectUrl, streamPairLookupId, token])
@@ -468,6 +478,8 @@ function App() {
     }
 
     if (currentLookup.feedback) {
+      setFeedbackLookup(null)
+      setFeedbackNote('')
       setMessage('Feedback has already been saved for this lookup.')
       return
     }
@@ -476,6 +488,8 @@ function App() {
     setLookup((visibleLookup) => (
       visibleLookup?.id === currentLookup.id ? optimisticLookup : visibleLookup
     ))
+    setFeedbackLookup(null)
+    setFeedbackNote('')
 
     try {
       const { lookup: updatedLookup } = await submitLookupFeedback(
@@ -504,6 +518,18 @@ function App() {
       ))
       setMessage(error instanceof Error ? error.message : 'Could not save feedback')
     }
+  }
+
+  function openIncorrectFeedback(currentLookup: ImageLookup) {
+    if (currentLookup.feedback) {
+      setFeedbackLookup(null)
+      setFeedbackNote('')
+      setMessage('Feedback has already been saved for this lookup.')
+      return
+    }
+
+    setFeedbackLookup(currentLookup)
+    setFeedbackNote('')
   }
 
   function renderLookupDetailCard(currentLookup: ImageLookup, className = 'lookup-detail-card') {
@@ -585,7 +611,7 @@ function App() {
               className="feedback-button incorrect"
               type="button"
               data-focusable
-              onClick={() => void saveLookupFeedback(currentLookup, 'incorrect')}
+              onClick={() => openIncorrectFeedback(currentLookup)}
             >
               Incorrect
             </button>
@@ -1605,6 +1631,48 @@ function App() {
             )}
           </div>
         </section>
+      )}
+
+      {feedbackLookup && (
+        <div className="feedback-modal-backdrop" role="dialog" aria-modal="true" aria-label="Incorrect Feedback">
+          <section className="feedback-modal glass-card">
+            <p className="eyebrow">Incorrect Result</p>
+            <h2>Help improve future matches</h2>
+            <p>
+              Optional: tell us what was wrong with the result. Notes help our systems get better over time.
+            </p>
+            <input
+              data-focusable
+              autoFocus
+              type="text"
+              inputMode="text"
+              placeholder="Optional note"
+              value={feedbackNote}
+              onChange={(event) => setFeedbackNote(event.target.value)}
+            />
+            <div className="feedback-modal-actions">
+              <button
+                className="primary-button"
+                type="button"
+                data-focusable
+                onClick={() => void saveLookupFeedback(feedbackLookup, 'incorrect', feedbackNote)}
+              >
+                Save Incorrect
+              </button>
+              <button
+                className="text-button"
+                type="button"
+                data-focusable
+                onClick={() => {
+                  setFeedbackLookup(null)
+                  setFeedbackNote('')
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </section>
+        </div>
       )}
 
       {showConfetti && (
