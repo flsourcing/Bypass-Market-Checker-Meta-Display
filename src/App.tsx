@@ -133,8 +133,6 @@ function App() {
   const [displayMenuOpen, setDisplayMenuOpen] = useState(false)
   const [historyLookups, setHistoryLookups] = useState<ImageLookup[]>([])
   const [historyDetailLookup, setHistoryDetailLookup] = useState<ImageLookup | null>(null)
-  const [historyDetailImageUrl, setHistoryDetailImageUrl] = useState<string | null>(null)
-  const [historyThumbnailUrls, setHistoryThumbnailUrls] = useState<Record<string, string>>({})
   const [historyMessage, setHistoryMessage] = useState('')
 
   useEffect(() => {
@@ -611,7 +609,6 @@ function App() {
 
     if (screen === 'settings' || screen === 'text-lookup' || screen === 'lookup-history') {
       setHistoryDetailLookup(null)
-      setHistoryDetailImageUrl(null)
       setScreen('home')
       setMessage('')
       return
@@ -684,41 +681,16 @@ function App() {
   }
 
   function historyThumbnailSrc(currentLookup: ImageLookup) {
-    return historyThumbnailUrls[currentLookup.id]
+    return currentLookup.imagePreview
       ?? currentLookup.catalogImageUrl
       ?? null
   }
 
-  async function loadHistoryThumbnails(lookups: ImageLookup[]) {
-    if (!token) {
-      return
-    }
-
-    const thumbnailEntries = await Promise.all(lookups.map(async (entry) => {
-      if (entry.catalogImageUrl) {
-        return [entry.id, entry.catalogImageUrl] as const
-      }
-
-      if (!entry.imageUrl) {
-        return null
-      }
-
-      try {
-        const blob = await fetchLookupImageBlob(token, entry.id)
-        return [entry.id, URL.createObjectURL(blob)] as const
-      } catch {
-        return null
-      }
-    }))
-
-    const nextThumbnails: Record<string, string> = {}
-    for (const entry of thumbnailEntries) {
-      if (entry) {
-        nextThumbnails[entry[0]] = entry[1]
-      }
-    }
-
-    setHistoryThumbnailUrls((current) => ({ ...current, ...nextThumbnails }))
+  function historyDetailImageSrc(currentLookup: ImageLookup) {
+    return currentLookup.imagePreview
+      ?? currentLookup.catalogImageUrl
+      ?? currentLookup.marketData?.alias?.product.mainPictureUrl
+      ?? null
   }
 
   async function openLookupHistory() {
@@ -735,9 +707,7 @@ function App() {
       const { lookups } = await listLookupHistory(token)
       setHistoryLookups(lookups)
       setHistoryDetailLookup(null)
-      setHistoryDetailImageUrl(null)
       setScreen('lookup-history')
-      void loadHistoryThumbnails(lookups)
     } catch (error) {
       setHistoryMessage(error instanceof Error ? error.message : 'Could not load lookup history')
     } finally {
@@ -745,42 +715,24 @@ function App() {
     }
   }
 
-  async function openHistoryDetail(entry: ImageLookup) {
-    if (!token) {
-      return
-    }
-
-    setIsBusy(true)
+  function openHistoryDetail(entry: ImageLookup) {
     setHistoryMessage('')
+    setHistoryDetailLookup(entry)
 
-    try {
-      const { lookup: detailedLookup } = await getImageLookup(token, entry.id)
-      setHistoryDetailLookup(detailedLookup)
-
-      if (detailedLookup.imagePreview) {
-        setHistoryDetailImageUrl(null)
-      } else if (detailedLookup.catalogImageUrl) {
-        setHistoryDetailImageUrl(detailedLookup.catalogImageUrl)
-      } else if (detailedLookup.imageUrl) {
-        const blob = await fetchLookupImageBlob(token, detailedLookup.id)
-        setHistoryDetailImageUrl(URL.createObjectURL(blob))
-      } else {
-        setHistoryDetailImageUrl(null)
-      }
-    } catch (error) {
-      setHistoryMessage(error instanceof Error ? error.message : 'Could not open lookup detail')
-    } finally {
-      setIsBusy(false)
+    if (entry.marketStatus === 'loading' && token) {
+      void getImageLookup(token, entry.id)
+        .then(({ lookup }) => {
+          setHistoryDetailLookup(lookup)
+          setHistoryLookups((items) => items.map((item) => (
+            item.id === lookup.id ? lookup : item
+          )))
+        })
+        .catch(() => {})
     }
   }
 
   function closeHistoryDetail() {
-    if (historyDetailImageUrl?.startsWith('blob:')) {
-      URL.revokeObjectURL(historyDetailImageUrl)
-    }
-
     setHistoryDetailLookup(null)
-    setHistoryDetailImageUrl(null)
   }
 
   function syncActiveLookupKind(currentLookup: ImageLookup) {
@@ -2253,9 +2205,7 @@ function App() {
               </div>
 
               {renderLookupDetailCard(historyDetailLookup, 'lookup-detail-card history-detail-card', {
-                imageSrc: historyDetailLookup.imagePreview
-                  ?? historyDetailImageUrl
-                  ?? historyDetailLookup.catalogImageUrl,
+                imageSrc: historyDetailImageSrc(historyDetailLookup),
               })}
             </>
           ) : (
@@ -2290,7 +2240,7 @@ function App() {
                           className="lookup-history-row-main"
                           type="button"
                           data-focusable
-                          onClick={() => void openHistoryDetail(entry)}
+                          onClick={() => openHistoryDetail(entry)}
                         >
                           {thumbnail ? (
                             <img className="lookup-history-thumb" src={thumbnail} alt="" />
