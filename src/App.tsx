@@ -32,6 +32,9 @@ import {
   setStoredToken,
   startStockXOAuth,
   submitLookupFeedback,
+  requestLookupDictation,
+  getLookupDictation,
+  cancelLookupDictation,
 } from './api'
 import type {
   ApiKeyRecord,
@@ -45,38 +48,48 @@ import type {
 type Screen = 'auth' | 'home' | 'settings' | 'lookup'
 type AuthMode = 'login' | 'register'
 type LookupKind = 'image' | 'barcode'
-type SpeechRecognitionEvent = Event & {
-  results: {
-    length: number
-    [index: number]: {
-      length: number
-      [index: number]: {
-        transcript: string
-      }
-    }
-  }
-}
-type SpeechRecognitionConstructor = new () => {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  onend: (() => void) | null
-  onerror: (() => void) | null
-  onresult: ((event: SpeechRecognitionEvent) => void) | null
-  start: () => void
-  stop: () => void
-}
 
-const FEEDBACK_KEYBOARD_ROWS = [
+const FEEDBACK_LETTER_ROWS = [
   ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
   ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
-  ['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
-  ['Space', 'Backspace', 'Clear', 'Done'],
+  ['Shift', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'Backspace'],
+  ['123', 'Space', '.', 'Clear', 'Done'],
 ]
+
+const FEEDBACK_NUMBER_ROWS = [
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+  ['@', '#', '$', '&', '*', '-', '_', '+', '=', '/'],
+  ['.', ',', '?', '!', "'", '"', ':', ';', '(', ')'],
+  ['ABC', 'Space', 'Backspace', 'Clear', 'Done'],
+]
+
+const FEEDBACK_KEYBOARD_WIDE_KEYS = new Set([
+  'Shift', 'Backspace', 'Clear', 'Done', 'Space', '123', 'ABC',
+])
+
+function getFeedbackKeyboardRows(numbers: boolean) {
+  return numbers ? FEEDBACK_NUMBER_ROWS : FEEDBACK_LETTER_ROWS
+}
+
+function getFeedbackKeyLabel(key: string, shift: boolean, numbers: boolean) {
+  if (key.length === 1 && /[A-Z]/.test(key) && !numbers) {
+    return shift ? key : key.toLowerCase()
+  }
+
+  if (key === 'Shift') {
+    return shift ? 'SHIFT' : 'Shift'
+  }
+
+  return key
+}
 
 function App() {
   const isDisplayApp = window.location.pathname.toLowerCase().includes('/display-app')
   const lastFeedbackActivationRef = useRef({ target: '', at: 0 })
+  const feedbackDictationPollRef = useRef<number | null>(null)
+  const feedbackDictationLookupIdRef = useRef<string | null>(null)
+  const feedbackDictationStartedAtRef = useRef(0)
+  const feedbackKeyboardShiftRef = useRef(false)
   const [screen, setScreen] = useState<Screen>('auth')
   const [authMode, setAuthMode] = useState<AuthMode>('login')
   const [token, setToken] = useState<string | null>(() => getStoredToken())
@@ -100,8 +113,14 @@ function App() {
   const [feedbackNote, setFeedbackNote] = useState('')
   const [feedbackKeyboardOpen, setFeedbackKeyboardOpen] = useState(false)
   const [feedbackKeyboardFocus, setFeedbackKeyboardFocus] = useState({ row: 0, col: 0 })
+  const [feedbackKeyboardShift, setFeedbackKeyboardShift] = useState(false)
+  const [feedbackKeyboardNumbers, setFeedbackKeyboardNumbers] = useState(false)
   const [feedbackModalMessage, setFeedbackModalMessage] = useState('')
   const [isListeningForFeedback, setIsListeningForFeedback] = useState(false)
+
+  useEffect(() => {
+    feedbackKeyboardShiftRef.current = feedbackKeyboardShift
+  }, [feedbackKeyboardShift])
   const [showConfetti, setShowConfetti] = useState(false)
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
@@ -146,13 +165,15 @@ function App() {
       const feedbackInputActive = Boolean(feedbackKeyboardOpen && feedbackLookup)
 
       if (feedbackInputActive) {
+        const keyboardRows = getFeedbackKeyboardRows(feedbackKeyboardNumbers)
+
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
           event.preventDefault()
           setFeedbackKeyboardFocus((current) => {
             if (current.row === -1) {
               return event.key === 'ArrowDown'
-                ? { row: 0, col: Math.min(current.col, FEEDBACK_KEYBOARD_ROWS[0].length - 1) }
-                : { row: FEEDBACK_KEYBOARD_ROWS.length - 1, col: 0 }
+                ? { row: 0, col: Math.min(current.col, keyboardRows[0].length - 1) }
+                : { row: keyboardRows.length - 1, col: 0 }
             }
 
             if (event.key === 'ArrowUp' && current.row === 0) {
@@ -160,8 +181,8 @@ function App() {
             }
 
             const direction = event.key === 'ArrowDown' ? 1 : -1
-            const nextRow = (current.row + direction + FEEDBACK_KEYBOARD_ROWS.length) % FEEDBACK_KEYBOARD_ROWS.length
-            const nextCol = Math.min(current.col, FEEDBACK_KEYBOARD_ROWS[nextRow].length - 1)
+            const nextRow = (current.row + direction + keyboardRows.length) % keyboardRows.length
+            const nextCol = Math.min(current.col, keyboardRows[nextRow].length - 1)
             return { row: nextRow, col: nextCol }
           })
           return
@@ -174,7 +195,7 @@ function App() {
               return current
             }
 
-            const rowLength = FEEDBACK_KEYBOARD_ROWS[current.row].length
+            const rowLength = keyboardRows[current.row].length
             const direction = event.key === 'ArrowRight' ? 1 : -1
             const nextCol = (current.col + direction + rowLength) % rowLength
             return { ...current, col: nextCol }
@@ -185,11 +206,11 @@ function App() {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
           if (feedbackKeyboardFocus.row === -1) {
-            startFeedbackDictation()
+            void startFeedbackDictation()
             return
           }
 
-          const key = FEEDBACK_KEYBOARD_ROWS[feedbackKeyboardFocus.row]?.[feedbackKeyboardFocus.col]
+          const key = keyboardRows[feedbackKeyboardFocus.row]?.[feedbackKeyboardFocus.col]
           if (key) {
             pressFeedbackKeyboardKey(key)
           }
@@ -246,7 +267,13 @@ function App() {
     window.addEventListener('keydown', handleKeyDown)
 
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [feedbackKeyboardFocus, feedbackKeyboardOpen, feedbackLookup, isDisplayApp])
+  }, [feedbackKeyboardFocus, feedbackKeyboardOpen, feedbackKeyboardNumbers, feedbackLookup, isDisplayApp])
+
+  useEffect(() => () => {
+    if (feedbackDictationPollRef.current) {
+      window.clearInterval(feedbackDictationPollRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (!token) {
@@ -636,20 +663,56 @@ function App() {
     setFeedbackLookup(currentLookup)
     setFeedbackNote('')
     setFeedbackModalMessage('')
+    setFeedbackKeyboardShift(false)
+    setFeedbackKeyboardNumbers(false)
     setFeedbackKeyboardOpen(isDisplayApp)
     setFeedbackKeyboardFocus({ row: 0, col: 0 })
+    feedbackDictationLookupIdRef.current = currentLookup.id
+  }
+
+  function stopFeedbackDictationPoll() {
+    if (feedbackDictationPollRef.current) {
+      window.clearInterval(feedbackDictationPollRef.current)
+      feedbackDictationPollRef.current = null
+    }
+    setIsListeningForFeedback(false)
+    feedbackDictationLookupIdRef.current = null
   }
 
   function closeIncorrectFeedback() {
+    const lookupId = feedbackDictationLookupIdRef.current ?? feedbackLookup?.id
+    if (token && lookupId && isListeningForFeedback) {
+      void cancelLookupDictation(token, lookupId)
+    }
+
+    stopFeedbackDictationPoll()
     setFeedbackLookup(null)
     setFeedbackNote('')
     setFeedbackModalMessage('')
     setFeedbackKeyboardOpen(false)
-    setIsListeningForFeedback(false)
+    setFeedbackKeyboardShift(false)
+    setFeedbackKeyboardNumbers(false)
   }
 
   function pressFeedbackKeyboardKey(key: string) {
     setFeedbackModalMessage('')
+
+    if (key === 'Shift') {
+      setFeedbackKeyboardShift((current) => !current)
+      return
+    }
+
+    if (key === '123') {
+      setFeedbackKeyboardNumbers(true)
+      setFeedbackKeyboardFocus({ row: 0, col: 0 })
+      return
+    }
+
+    if (key === 'ABC') {
+      setFeedbackKeyboardNumbers(false)
+      setFeedbackKeyboardFocus({ row: 0, col: 0 })
+      return
+    }
 
     if (key === 'Backspace') {
       setFeedbackNote((current) => current.slice(0, -1))
@@ -671,7 +734,13 @@ function App() {
       return
     }
 
-    setFeedbackNote((current) => `${current}${key.toLowerCase()}`)
+    if (key.length === 1 && /[A-Z]/.test(key)) {
+      const useUpper = feedbackKeyboardShiftRef.current
+      setFeedbackNote((current) => `${current}${useUpper ? key : key.toLowerCase()}`)
+      return
+    }
+
+    setFeedbackNote((current) => `${current}${key}`)
   }
 
   function activateFeedbackTarget(target: string, action: () => void) {
@@ -686,41 +755,75 @@ function App() {
     action()
   }
 
-  function startFeedbackDictation() {
-    const speechWindow = window as Window & {
-      SpeechRecognition?: SpeechRecognitionConstructor
-      webkitSpeechRecognition?: SpeechRecognitionConstructor
-    }
-    const SpeechRecognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition
-
-    if (!SpeechRecognition) {
-      setFeedbackModalMessage('Voice input is not available on glasses. Use the on-screen keyboard below.')
+  async function startFeedbackDictation() {
+    if (!token || !feedbackLookup) {
+      setFeedbackModalMessage('Log in before dictating a note.')
       return
     }
 
+    if (isListeningForFeedback) {
+      return
+    }
+
+    const lookupId = feedbackLookup.id
+    feedbackDictationLookupIdRef.current = lookupId
+
     try {
-      const recognition = new SpeechRecognition()
-      recognition.continuous = false
-      recognition.interimResults = false
-      recognition.lang = 'en-US'
-      recognition.onresult = (event) => {
-        const transcript = event.results[0]?.[0]?.transcript.trim()
-        if (transcript) {
-          setFeedbackNote((current) => [current.trim(), transcript].filter(Boolean).join(' '))
-          setFeedbackModalMessage('')
-        }
-      }
-      recognition.onerror = () => {
-        setIsListeningForFeedback(false)
-        setFeedbackModalMessage('Could not access the microphone here. Use the on-screen keyboard below.')
-      }
-      recognition.onend = () => setIsListeningForFeedback(false)
-      setFeedbackModalMessage('')
+      setFeedbackModalMessage('Connecting to iPhone microphone...')
+      await requestLookupDictation(token, lookupId)
       setIsListeningForFeedback(true)
-      recognition.start()
-    } catch {
-      setIsListeningForFeedback(false)
-      setFeedbackModalMessage('Microphone access was blocked. Use the on-screen keyboard below.')
+      setFeedbackModalMessage('Keep the iPhone app open, then speak your note.')
+      feedbackDictationStartedAtRef.current = Date.now()
+
+      feedbackDictationPollRef.current = window.setInterval(() => {
+        void (async () => {
+          const activeLookupId = feedbackDictationLookupIdRef.current
+          if (!token || !activeLookupId) {
+            stopFeedbackDictationPoll()
+            return
+          }
+
+          try {
+            const { dictation } = await getLookupDictation(token, activeLookupId)
+
+            if (dictation.status === 'listening') {
+              setFeedbackModalMessage('Listening on iPhone... speak now.')
+            }
+
+            if (dictation.status === 'complete' && dictation.transcript?.trim()) {
+              const transcript = dictation.transcript.trim()
+              setFeedbackNote((current) => [current.trim(), transcript].filter(Boolean).join(' '))
+              setFeedbackModalMessage('')
+              stopFeedbackDictationPoll()
+              return
+            }
+
+            if (dictation.status === 'error' || dictation.error) {
+              setFeedbackModalMessage(dictation.error ?? 'Dictation failed. Use the keyboard below.')
+              stopFeedbackDictationPoll()
+              return
+            }
+
+            if (dictation.status === 'cancelled') {
+              setFeedbackModalMessage('Dictation cancelled.')
+              stopFeedbackDictationPoll()
+              return
+            }
+
+            if (Date.now() - feedbackDictationStartedAtRef.current > 20000) {
+              await cancelLookupDictation(token, activeLookupId)
+              setFeedbackModalMessage('Dictation timed out. Open the iPhone app and try again.')
+              stopFeedbackDictationPoll()
+            }
+          } catch {
+            setFeedbackModalMessage('Could not reach dictation service. Use the keyboard below.')
+            stopFeedbackDictationPoll()
+          }
+        })()
+      }, 500)
+    } catch (error) {
+      setFeedbackModalMessage(error instanceof Error ? error.message : 'Could not start dictation.')
+      stopFeedbackDictationPoll()
     }
   }
 
@@ -1835,7 +1938,8 @@ function App() {
             </p>
             {isDisplayApp && (
               <p className="feedback-glasses-hint">
-                Use arrow keys to move, select to type. Arrow up from the top row reaches the microphone.
+                Use arrows + select to type. Shift toggles upper case, 123 switches to numbers.
+                Arrow up from the top row reaches the microphone (uses your iPhone).
               </p>
             )}
             <div className="feedback-input-wrap">
@@ -1870,10 +1974,10 @@ function App() {
                 onMouseEnter={() => setFeedbackKeyboardFocus({ row: -1, col: 0 })}
                 onPointerEnter={() => setFeedbackKeyboardFocus({ row: -1, col: 0 })}
                 onPointerDown={() => setFeedbackKeyboardFocus({ row: -1, col: 0 })}
-                onPointerUp={() => activateFeedbackTarget('mic', startFeedbackDictation)}
-                onMouseUp={() => activateFeedbackTarget('mic', startFeedbackDictation)}
-                onTouchEnd={() => activateFeedbackTarget('mic', startFeedbackDictation)}
-                onClick={() => activateFeedbackTarget('mic', startFeedbackDictation)}
+                onPointerUp={() => activateFeedbackTarget('mic', () => { void startFeedbackDictation() })}
+                onMouseUp={() => activateFeedbackTarget('mic', () => { void startFeedbackDictation() })}
+                onTouchEnd={() => activateFeedbackTarget('mic', () => { void startFeedbackDictation() })}
+                onClick={() => activateFeedbackTarget('mic', () => { void startFeedbackDictation() })}
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24">
                   <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" />
@@ -1884,23 +1988,24 @@ function App() {
               </button>
             </div>
             {isListeningForFeedback && (
-              <p className="feedback-listening-note">Listening...</p>
+              <p className="feedback-listening-note">Listening on iPhone...</p>
             )}
             {feedbackModalMessage && (
               <p className="feedback-modal-message">{feedbackModalMessage}</p>
             )}
             {feedbackKeyboardOpen && (
               <div className="feedback-keyboard" aria-label="Feedback note keyboard">
-                {FEEDBACK_KEYBOARD_ROWS.map((row, rowIndex) => (
-                  <div className="feedback-keyboard-row" key={row.join('')}>
+                {getFeedbackKeyboardRows(feedbackKeyboardNumbers).map((row, rowIndex) => (
+                  <div className="feedback-keyboard-row" key={`${feedbackKeyboardNumbers ? 'num' : 'alpha'}-${row.join('')}`}>
                     {row.map((key, colIndex) => {
                       const isActive = feedbackKeyboardFocus.row === rowIndex
                         && feedbackKeyboardFocus.col === colIndex
-                      const isWide = key === 'Space' || key === 'Backspace' || key === 'Clear' || key === 'Done'
+                      const isWide = FEEDBACK_KEYBOARD_WIDE_KEYS.has(key)
+                      const isShiftActive = key === 'Shift' && feedbackKeyboardShift
 
                       return (
                         <button
-                          className={`feedback-key ${isActive ? 'active' : ''} ${isWide ? 'wide' : ''}`}
+                          className={`feedback-key ${isActive ? 'active' : ''} ${isWide ? 'wide' : ''} ${isShiftActive ? 'shift-active' : ''}`}
                           key={key}
                           type="button"
                           aria-label={key}
@@ -1913,7 +2018,7 @@ function App() {
                           onTouchEnd={() => activateFeedbackTarget(`key:${key}`, () => pressFeedbackKeyboardKey(key))}
                           onClick={() => activateFeedbackTarget(`key:${key}`, () => pressFeedbackKeyboardKey(key))}
                         >
-                          {key}
+                          {getFeedbackKeyLabel(key, feedbackKeyboardShift, feedbackKeyboardNumbers)}
                         </button>
                       )
                     })}

@@ -93,6 +93,14 @@ export type IntegrationStatus = {
   redirectUri?: string
 }
 
+export type LookupDictation = {
+  lookupId: string
+  status: 'requested' | 'listening' | 'complete' | 'error' | 'cancelled' | null
+  transcript: string | null
+  error: string | null
+  updatedAt: string | null
+}
+
 export type ImageLookup = {
   id: string
   captureCode: string
@@ -282,6 +290,33 @@ export async function submitLookupFeedback(
     token,
     body: { status, note, correction: note },
   })
+}
+
+export async function requestLookupDictation(token: string, lookupId: string) {
+  return apiRequest<{ dictation: LookupDictation }>(
+    `/lookups/${encodeURIComponent(lookupId)}/dictation/request`,
+    {
+      method: 'POST',
+      token,
+    },
+  )
+}
+
+export async function getLookupDictation(token: string, lookupId: string) {
+  return apiRequest<{ dictation: LookupDictation }>(
+    `/lookups/${encodeURIComponent(lookupId)}/dictation`,
+    { token },
+  )
+}
+
+export async function cancelLookupDictation(token: string, lookupId: string) {
+  return apiRequest<{ dictation: LookupDictation } | null>(
+    `/lookups/${encodeURIComponent(lookupId)}/dictation/cancel`,
+    {
+      method: 'POST',
+      token,
+    },
+  )
 }
 
 export async function fetchLookupImageBlob(token: string, lookupId: string) {
