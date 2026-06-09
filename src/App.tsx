@@ -45,6 +45,34 @@ import type {
 type Screen = 'auth' | 'home' | 'settings' | 'lookup'
 type AuthMode = 'login' | 'register'
 type LookupKind = 'image' | 'barcode'
+type SpeechRecognitionEvent = Event & {
+  results: {
+    length: number
+    [index: number]: {
+      length: number
+      [index: number]: {
+        transcript: string
+      }
+    }
+  }
+}
+type SpeechRecognitionConstructor = new () => {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onend: (() => void) | null
+  onerror: (() => void) | null
+  onresult: ((event: SpeechRecognitionEvent) => void) | null
+  start: () => void
+  stop: () => void
+}
+
+const FEEDBACK_KEYBOARD_ROWS = [
+  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+  ['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
+  ['Space', 'Backspace', 'Clear', 'Done'],
+]
 
 function App() {
   const isDisplayApp = window.location.pathname.toLowerCase().includes('/display-app')
@@ -69,6 +97,9 @@ function App() {
   const [message, setMessage] = useState('')
   const [feedbackLookup, setFeedbackLookup] = useState<ImageLookup | null>(null)
   const [feedbackNote, setFeedbackNote] = useState('')
+  const [feedbackKeyboardOpen, setFeedbackKeyboardOpen] = useState(false)
+  const [feedbackKeyboardFocus, setFeedbackKeyboardFocus] = useState({ row: 0, col: 0 })
+  const [isListeningForFeedback, setIsListeningForFeedback] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
@@ -98,6 +129,39 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (feedbackKeyboardOpen && feedbackLookup) {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault()
+          setFeedbackKeyboardFocus((current) => {
+            const direction = event.key === 'ArrowDown' ? 1 : -1
+            const nextRow = (current.row + direction + FEEDBACK_KEYBOARD_ROWS.length) % FEEDBACK_KEYBOARD_ROWS.length
+            const nextCol = Math.min(current.col, FEEDBACK_KEYBOARD_ROWS[nextRow].length - 1)
+            return { row: nextRow, col: nextCol }
+          })
+          return
+        }
+
+        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+          event.preventDefault()
+          setFeedbackKeyboardFocus((current) => {
+            const rowLength = FEEDBACK_KEYBOARD_ROWS[current.row].length
+            const direction = event.key === 'ArrowRight' ? 1 : -1
+            const nextCol = (current.col + direction + rowLength) % rowLength
+            return { ...current, col: nextCol }
+          })
+          return
+        }
+
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          const key = FEEDBACK_KEYBOARD_ROWS[feedbackKeyboardFocus.row]?.[feedbackKeyboardFocus.col]
+          if (key) {
+            pressFeedbackKeyboardKey(key)
+          }
+          return
+        }
+      }
+
       const active = document.activeElement as HTMLElement | null
       const scrollContainer = active?.matches('[data-scrollable]')
         ? active
@@ -144,7 +208,7 @@ function App() {
     window.addEventListener('keydown', handleKeyDown)
 
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [feedbackKeyboardFocus, feedbackKeyboardOpen, feedbackLookup])
 
   useEffect(() => {
     if (!token) {
@@ -490,6 +554,8 @@ function App() {
     ))
     setFeedbackLookup(null)
     setFeedbackNote('')
+    setFeedbackKeyboardOpen(false)
+    setIsListeningForFeedback(false)
 
     try {
       const { lookup: updatedLookup } = await submitLookupFeedback(
@@ -524,12 +590,82 @@ function App() {
     if (currentLookup.feedback) {
       setFeedbackLookup(null)
       setFeedbackNote('')
+      setFeedbackKeyboardOpen(false)
       setMessage('Feedback has already been saved for this lookup.')
       return
     }
 
     setFeedbackLookup(currentLookup)
     setFeedbackNote('')
+    setFeedbackKeyboardOpen(false)
+    setFeedbackKeyboardFocus({ row: 0, col: 0 })
+  }
+
+  function closeIncorrectFeedback() {
+    setFeedbackLookup(null)
+    setFeedbackNote('')
+    setFeedbackKeyboardOpen(false)
+    setIsListeningForFeedback(false)
+  }
+
+  function pressFeedbackKeyboardKey(key: string) {
+    if (key === 'Backspace') {
+      setFeedbackNote((current) => current.slice(0, -1))
+      return
+    }
+
+    if (key === 'Clear') {
+      setFeedbackNote('')
+      return
+    }
+
+    if (key === 'Done') {
+      setFeedbackKeyboardOpen(false)
+      return
+    }
+
+    if (key === 'Space') {
+      setFeedbackNote((current) => `${current} `)
+      return
+    }
+
+    setFeedbackNote((current) => `${current}${key.toLowerCase()}`)
+  }
+
+  function startFeedbackDictation() {
+    const speechWindow = window as Window & {
+      SpeechRecognition?: SpeechRecognitionConstructor
+      webkitSpeechRecognition?: SpeechRecognitionConstructor
+    }
+    const SpeechRecognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition
+
+    if (!SpeechRecognition) {
+      setMessage('Microphone dictation is not available in this glasses browser. Use the iPhone note input for voice.')
+      return
+    }
+
+    try {
+      const recognition = new SpeechRecognition()
+      recognition.continuous = false
+      recognition.interimResults = false
+      recognition.lang = 'en-US'
+      recognition.onresult = (event) => {
+        const transcript = event.results[0]?.[0]?.transcript.trim()
+        if (transcript) {
+          setFeedbackNote((current) => [current.trim(), transcript].filter(Boolean).join(' '))
+        }
+      }
+      recognition.onerror = () => {
+        setIsListeningForFeedback(false)
+        setMessage('Could not access microphone here. Use the iPhone note input for voice.')
+      }
+      recognition.onend = () => setIsListeningForFeedback(false)
+      setIsListeningForFeedback(true)
+      recognition.start()
+    } catch {
+      setIsListeningForFeedback(false)
+      setMessage('Microphone access was blocked here. Use the iPhone note input for voice.')
+    }
   }
 
   function renderLookupDetailCard(currentLookup: ImageLookup, className = 'lookup-detail-card') {
@@ -1641,15 +1777,61 @@ function App() {
             <p>
               Optional: tell us what was wrong with the result. Notes help our systems get better over time.
             </p>
-            <input
-              data-focusable
-              autoFocus
-              type="text"
-              inputMode="text"
-              placeholder="Optional note"
-              value={feedbackNote}
-              onChange={(event) => setFeedbackNote(event.target.value)}
-            />
+            <div className="feedback-input-wrap">
+              <input
+                data-focusable
+                autoFocus
+                type="text"
+                inputMode="text"
+                placeholder="Optional note"
+                value={feedbackNote}
+                onFocus={() => setFeedbackKeyboardOpen(true)}
+                onClick={() => setFeedbackKeyboardOpen(true)}
+                onChange={(event) => setFeedbackNote(event.target.value)}
+              />
+              <button
+                className={`feedback-mic-button ${isListeningForFeedback ? 'listening' : ''}`}
+                type="button"
+                data-focusable
+                aria-label="Dictate incorrect feedback note"
+                onClick={startFeedbackDictation}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" />
+                  <path d="M5 11a7 7 0 0 0 14 0" />
+                  <path d="M12 18v3" />
+                  <path d="M8 21h8" />
+                </svg>
+              </button>
+            </div>
+            {isListeningForFeedback && (
+              <p className="feedback-listening-note">Listening...</p>
+            )}
+            {feedbackKeyboardOpen && (
+              <div className="feedback-keyboard" aria-label="Feedback note keyboard">
+                {FEEDBACK_KEYBOARD_ROWS.map((row, rowIndex) => (
+                  <div className="feedback-keyboard-row" key={row.join('')}>
+                    {row.map((key, colIndex) => {
+                      const isActive = feedbackKeyboardFocus.row === rowIndex
+                        && feedbackKeyboardFocus.col === colIndex
+                      const isWide = key === 'Space' || key === 'Backspace' || key === 'Clear' || key === 'Done'
+
+                      return (
+                        <button
+                          className={`feedback-key ${isActive ? 'active' : ''} ${isWide ? 'wide' : ''}`}
+                          key={key}
+                          type="button"
+                          aria-label={key}
+                          onClick={() => pressFeedbackKeyboardKey(key)}
+                        >
+                          {key}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="feedback-modal-actions">
               <button
                 className="primary-button"
@@ -1663,10 +1845,7 @@ function App() {
                 className="text-button"
                 type="button"
                 data-focusable
-                onClick={() => {
-                  setFeedbackLookup(null)
-                  setFeedbackNote('')
-                }}
+                onClick={closeIncorrectFeedback}
               >
                 Cancel
               </button>
