@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
 import './App.css'
 import {
@@ -76,6 +76,7 @@ const FEEDBACK_KEYBOARD_ROWS = [
 
 function App() {
   const isDisplayApp = window.location.pathname.toLowerCase().includes('/display-app')
+  const lastFeedbackActivationRef = useRef({ target: '', at: 0 })
   const [screen, setScreen] = useState<Screen>('auth')
   const [authMode, setAuthMode] = useState<AuthMode>('login')
   const [token, setToken] = useState<string | null>(() => getStoredToken())
@@ -649,6 +650,18 @@ function App() {
     }
 
     setFeedbackNote((current) => `${current}${key.toLowerCase()}`)
+  }
+
+  function activateFeedbackTarget(target: string, action: () => void) {
+    const now = Date.now()
+    const lastActivation = lastFeedbackActivationRef.current
+
+    if (lastActivation.target === target && now - lastActivation.at < 250) {
+      return
+    }
+
+    lastFeedbackActivationRef.current = { target, at: now }
+    action()
   }
 
   function startFeedbackDictation() {
@@ -1814,9 +1827,13 @@ function App() {
                 data-focusable
                 aria-label="Dictate incorrect feedback note"
                 onFocus={() => setFeedbackKeyboardFocus({ row: -1, col: 0 })}
+                onMouseEnter={() => setFeedbackKeyboardFocus({ row: -1, col: 0 })}
                 onPointerEnter={() => setFeedbackKeyboardFocus({ row: -1, col: 0 })}
                 onPointerDown={() => setFeedbackKeyboardFocus({ row: -1, col: 0 })}
-                onClick={startFeedbackDictation}
+                onPointerUp={() => activateFeedbackTarget('mic', startFeedbackDictation)}
+                onMouseUp={() => activateFeedbackTarget('mic', startFeedbackDictation)}
+                onTouchEnd={() => activateFeedbackTarget('mic', startFeedbackDictation)}
+                onClick={() => activateFeedbackTarget('mic', startFeedbackDictation)}
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24">
                   <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" />
@@ -1845,12 +1862,13 @@ function App() {
                           type="button"
                           aria-label={key}
                           onFocus={() => setFeedbackKeyboardFocus({ row: rowIndex, col: colIndex })}
+                          onMouseEnter={() => setFeedbackKeyboardFocus({ row: rowIndex, col: colIndex })}
                           onPointerEnter={() => setFeedbackKeyboardFocus({ row: rowIndex, col: colIndex })}
-                          onPointerDown={(event) => {
-                            event.preventDefault()
-                            setFeedbackKeyboardFocus({ row: rowIndex, col: colIndex })
-                          }}
-                          onClick={() => pressFeedbackKeyboardKey(key)}
+                          onPointerDown={() => setFeedbackKeyboardFocus({ row: rowIndex, col: colIndex })}
+                          onPointerUp={() => activateFeedbackTarget(`key:${key}`, () => pressFeedbackKeyboardKey(key))}
+                          onMouseUp={() => activateFeedbackTarget(`key:${key}`, () => pressFeedbackKeyboardKey(key))}
+                          onTouchEnd={() => activateFeedbackTarget(`key:${key}`, () => pressFeedbackKeyboardKey(key))}
+                          onClick={() => activateFeedbackTarget(`key:${key}`, () => pressFeedbackKeyboardKey(key))}
                         >
                           {key}
                         </button>
