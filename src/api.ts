@@ -439,6 +439,14 @@ export async function deleteAliasIntegration(token: string) {
   })
 }
 
+export async function revealAliasIntegration(token: string) {
+  return apiRequest<{
+    email: string
+    password: string
+    apiKey: string
+  }>('/integrations/alias/reveal', { token })
+}
+
 export async function getStockXIntegration(token: string) {
   return apiRequest<{ integration: IntegrationStatus }>('/integrations/stockx', { token })
 }
@@ -459,6 +467,16 @@ export async function deleteStockXIntegration(token: string) {
     method: 'DELETE',
     token,
   })
+}
+
+export async function revealStockXIntegration(token: string) {
+  return apiRequest<{
+    email: string
+    apiKey: string
+    clientId: string
+    clientSecret: string
+    oauthConnected: boolean
+  }>('/integrations/stockx/reveal', { token })
 }
 
 export async function startStockXOAuth(token: string) {

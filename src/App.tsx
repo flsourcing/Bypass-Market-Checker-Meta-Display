@@ -11,6 +11,8 @@ import {
   deleteAliasIntegration,
   deleteApiKey,
   deleteStockXIntegration,
+  revealAliasIntegration,
+  revealStockXIntegration,
   fetchLookupImageBlob,
   formatMarketPrice,
   getAliasIntegration,
@@ -85,6 +87,96 @@ function getFeedbackKeyLabel(key: string, shift: boolean, numbers: boolean) {
   }
 
   return key
+}
+
+type NavigationDirection = 'up' | 'down' | 'left' | 'right'
+
+function getNavigationDirection(key: string): NavigationDirection | null {
+  if (key === 'ArrowDown') {
+    return 'down'
+  }
+
+  if (key === 'ArrowUp') {
+    return 'up'
+  }
+
+  if (key === 'ArrowRight') {
+    return 'right'
+  }
+
+  if (key === 'ArrowLeft') {
+    return 'left'
+  }
+
+  return null
+}
+
+function findSpatialFocusTarget(
+  elements: HTMLElement[],
+  current: HTMLElement | null,
+  direction: NavigationDirection,
+) {
+  if (elements.length === 0) {
+    return null
+  }
+
+  if (!current) {
+    return elements[0]
+  }
+
+  const currentRect = current.getBoundingClientRect()
+  const currentCenter = {
+    x: currentRect.left + currentRect.width / 2,
+    y: currentRect.top + currentRect.height / 2,
+  }
+
+  let best: HTMLElement | null = null
+  let bestScore = Number.POSITIVE_INFINITY
+
+  for (const element of elements) {
+    if (element === current) {
+      continue
+    }
+
+    const rect = element.getBoundingClientRect()
+    const center = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+    const dx = center.x - currentCenter.x
+    const dy = center.y - currentCenter.y
+
+    if (direction === 'down' && dy <= 12) {
+      continue
+    }
+
+    if (direction === 'up' && dy >= -12) {
+      continue
+    }
+
+    if (direction === 'right' && dx <= 12) {
+      continue
+    }
+
+    if (direction === 'left' && dx >= -12) {
+      continue
+    }
+
+    const primary = direction === 'down' || direction === 'up'
+      ? Math.abs(dy)
+      : Math.abs(dx)
+    const secondary = direction === 'down' || direction === 'up'
+      ? Math.abs(dx)
+      : Math.abs(dy)
+    const score = (primary * 1000) + secondary
+
+    if (score < bestScore) {
+      bestScore = score
+      best = element
+    }
+  }
+
+  return best
 }
 
 function App() {
@@ -287,6 +379,8 @@ function App() {
         ? active
         : active?.closest<HTMLElement>('[data-scrollable]') ?? null
 
+      const navigationDirection = getNavigationDirection(event.key)
+
       if (scrollContainer && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
         event.preventDefault()
         const delta = event.key === 'ArrowDown' ? 140 : -140
@@ -309,7 +403,28 @@ function App() {
       const focusableElements = Array.from(
         document.querySelectorAll<HTMLElement>(focusableSelector),
       )
-      const currentIndex = focusableElements.findIndex((element) => element === document.activeElement)
+      const activeElement = document.activeElement as HTMLElement | null
+
+      if (isDisplayApp && navigationDirection) {
+        const nextElement = findSpatialFocusTarget(
+          focusableElements,
+          activeElement,
+          navigationDirection,
+        )
+
+        if (nextElement) {
+          event.preventDefault()
+          nextElement.focus()
+          return
+        }
+
+        if (navigationDirection === 'down' || navigationDirection === 'up') {
+          event.preventDefault()
+          return
+        }
+      }
+
+      const currentIndex = focusableElements.findIndex((element) => element === activeElement)
 
       if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
         event.preventDefault()
@@ -1543,6 +1658,7 @@ function App() {
     try {
       await deleteAliasIntegration(token)
       setAliasIntegration(null)
+      hideRevealedCredential('alias')
       setMessage('Alias credentials removed.')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not remove Alias credentials')
@@ -1562,6 +1678,7 @@ function App() {
     try {
       await deleteStockXIntegration(token)
       setStockxIntegration(null)
+      hideRevealedCredential('stockx')
       setMessage('StockX credentials removed.')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not remove StockX credentials')
@@ -1620,17 +1737,21 @@ function App() {
     }
   }
 
+  function hideRevealedCredential(key: string) {
+    setRevealedKeys((current) => {
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+  }
+
   async function handleToggleApiKey(providerName: string) {
     if (!token) {
       return
     }
 
     if (revealedKeys[providerName]) {
-      setRevealedKeys((current) => {
-        const next = { ...current }
-        delete next[providerName]
-        return next
-      })
+      hideRevealedCredential(providerName)
       return
     }
 
@@ -1645,6 +1766,68 @@ function App() {
       }))
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not show API key')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleToggleAliasCredentials() {
+    if (!token) {
+      return
+    }
+
+    if (revealedKeys.alias) {
+      hideRevealedCredential('alias')
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      const result = await revealAliasIntegration(token)
+      setRevealedKeys((current) => ({
+        ...current,
+        alias: [
+          `Email: ${result.email}`,
+          `Password: ${result.password}`,
+          `API Key: ${result.apiKey}`,
+        ].join('\n'),
+      }))
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not show Alias credentials')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleToggleStockXCredentials() {
+    if (!token) {
+      return
+    }
+
+    if (revealedKeys.stockx) {
+      hideRevealedCredential('stockx')
+      return
+    }
+
+    setIsBusy(true)
+    setMessage('')
+
+    try {
+      const result = await revealStockXIntegration(token)
+      setRevealedKeys((current) => ({
+        ...current,
+        stockx: [
+          `Email: ${result.email}`,
+          `API Key: ${result.apiKey}`,
+          `Client ID: ${result.clientId}`,
+          `Client Secret: ${result.clientSecret}`,
+          `OAuth: ${result.oauthConnected ? 'Connected' : 'Not connected'}`,
+        ].join('\n'),
+      }))
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not show StockX credentials')
     } finally {
       setIsBusy(false)
     }
@@ -2302,7 +2485,11 @@ function App() {
       )}
 
       {screen === 'settings' && (
-        <section className="glass-card settings-card" aria-label="Settings">
+        <section
+          className="glass-card settings-card"
+          aria-label="Settings"
+          data-scrollable={isDisplayApp ? true : undefined}
+        >
           <div className="card-header">
             <div>
               <p className="eyebrow">Settings</p>
@@ -2313,6 +2500,8 @@ function App() {
             </button>
           </div>
 
+          {isDisplayApp && <p className="scroll-hint">Use up/down and left/right to move between controls.</p>}
+
           {message && <p className="center-message settings-message">{message}</p>}
 
           <div className="key-list">
@@ -2322,7 +2511,7 @@ function App() {
                 <div className="key-info">
                   <span>{record.provider}</span>
                   {revealedKeys[record.provider] && (
-                    <code>{revealedKeys[record.provider]}</code>
+                    <code className="revealed-credentials">{revealedKeys[record.provider]}</code>
                   )}
                 </div>
                 <div className="key-actions">
@@ -2332,7 +2521,7 @@ function App() {
                     data-focusable
                     disabled={isBusy}
                     aria-label={revealedKeys[record.provider] ? `Hide ${record.provider} API key` : `Show ${record.provider} API key`}
-                    onClick={() => handleToggleApiKey(record.provider)}
+                    onClick={() => void handleToggleApiKey(record.provider)}
                   >
                     <svg aria-hidden="true" viewBox="0 0 24 24">
                       <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" />
@@ -2345,7 +2534,7 @@ function App() {
                     data-focusable
                     disabled={isBusy}
                     aria-label={`Delete ${record.provider} API key`}
-                    onClick={() => handleDeleteApiKey(record.provider)}
+                    onClick={() => void handleDeleteApiKey(record.provider)}
                   >
                     <svg aria-hidden="true" viewBox="0 0 24 24">
                       <path d="M4 7h16" />
@@ -2360,156 +2549,224 @@ function App() {
             ))}
           </div>
 
-          <form className="stack-form" onSubmit={handleSaveApiKey}>
-            <div className="add-label">+ Add API Key</div>
-            <select data-focusable value={provider} onChange={(event) => setProvider(event.target.value)}>
-              <option value="gemini">Gemini Vision</option>
-            </select>
-            <input
-              data-focusable
-              type="password"
-              placeholder="Paste API key"
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-            />
-            <button
-              className={`primary-button ${apiKey.trim() ? 'ready-button' : ''}`}
-              type="submit"
-              data-focusable
-              disabled={isBusy || !apiKey.trim()}
-            >
-              Save API Key
-            </button>
-          </form>
+          {!isDisplayApp && (
+            <form className="stack-form" onSubmit={handleSaveApiKey}>
+              <div className="add-label">+ Add API Key</div>
+              <select data-focusable value={provider} onChange={(event) => setProvider(event.target.value)}>
+                <option value="gemini">Gemini Vision</option>
+              </select>
+              <input
+                data-focusable
+                type="password"
+                placeholder="Paste API key"
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+              />
+              <button
+                className={`primary-button ${apiKey.trim() ? 'ready-button' : ''}`}
+                type="submit"
+                data-focusable
+                disabled={isBusy || !apiKey.trim()}
+              >
+                Save API Key
+              </button>
+            </form>
+          )}
 
           <div className="integration-section">
             <div className="add-label">Alias (GOAT)</div>
-            {aliasIntegration?.configured && (
-              <p className="integration-status">
-                Connected as {aliasIntegration.email ?? 'saved account'}
-              </p>
+            {aliasIntegration?.configured ? (
+              <div className="key-row">
+                <div className="key-info">
+                  <span className="integration-email-chip">{aliasIntegration.email ?? 'Saved account'}</span>
+                  {revealedKeys.alias && (
+                    <code className="revealed-credentials">{revealedKeys.alias}</code>
+                  )}
+                </div>
+                <div className="key-actions">
+                  <button
+                    className="icon-button"
+                    type="button"
+                    data-focusable
+                    disabled={isBusy}
+                    aria-label={revealedKeys.alias ? 'Hide Alias credentials' : 'Show Alias credentials'}
+                    onClick={() => void handleToggleAliasCredentials()}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                  <button
+                    className="icon-button trash-button"
+                    type="button"
+                    data-focusable
+                    disabled={isBusy}
+                    aria-label="Remove Alias integration"
+                    onClick={() => void handleDeleteAliasIntegration()}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M4 7h16" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                      <path d="M6 7l1 14h10l1-14" />
+                      <path d="M9 7V4h6v3" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="integration-status">Not connected</p>
             )}
-            <form className="stack-form" onSubmit={handleSaveAliasIntegration}>
-              <input
-                data-focusable
-                type="email"
-                placeholder="Alias email"
-                value={aliasEmail}
-                onChange={(event) => setAliasEmail(event.target.value)}
-              />
-              <input
-                data-focusable
-                type="password"
-                placeholder="Alias password"
-                value={aliasPassword}
-                onChange={(event) => setAliasPassword(event.target.value)}
-              />
-              <input
-                data-focusable
-                type="password"
-                placeholder="Alias API key (authorization token)"
-                value={aliasApiKey}
-                onChange={(event) => setAliasApiKey(event.target.value)}
-              />
-              <button
-                className="primary-button"
-                type="submit"
-                data-focusable
-                disabled={isBusy || !aliasEmail.trim() || !aliasPassword.trim() || !aliasApiKey.trim()}
-              >
-                Save Alias
-              </button>
-            </form>
-            {aliasIntegration?.configured && (
-              <button
-                className="text-button danger"
-                type="button"
-                data-focusable
-                disabled={isBusy}
-                onClick={() => void handleDeleteAliasIntegration()}
-              >
-                Remove Alias
-              </button>
+
+            {!isDisplayApp && (
+              <form className="stack-form" onSubmit={handleSaveAliasIntegration}>
+                <input
+                  data-focusable
+                  type="email"
+                  placeholder="Alias email"
+                  value={aliasEmail}
+                  onChange={(event) => setAliasEmail(event.target.value)}
+                />
+                <input
+                  data-focusable
+                  type="password"
+                  placeholder="Alias password"
+                  value={aliasPassword}
+                  onChange={(event) => setAliasPassword(event.target.value)}
+                />
+                <input
+                  data-focusable
+                  type="password"
+                  placeholder="Alias API key (authorization token)"
+                  value={aliasApiKey}
+                  onChange={(event) => setAliasApiKey(event.target.value)}
+                />
+                <button
+                  className="primary-button"
+                  type="submit"
+                  data-focusable
+                  disabled={isBusy || !aliasEmail.trim() || !aliasPassword.trim() || !aliasApiKey.trim()}
+                >
+                  Save Alias
+                </button>
+              </form>
             )}
           </div>
 
           <div className="integration-section">
             <div className="add-label">StockX</div>
-            {stockxIntegration?.configured && (
-              <p className="integration-status">
-                {stockxIntegration.email ?? 'Saved account'}
-                {stockxIntegration.oauthConnected ? ' · OAuth connected' : ' · Login required'}
-              </p>
+            {stockxIntegration?.configured ? (
+              <div className="key-row">
+                <div className="key-info">
+                  <span className="integration-email-chip">
+                    {stockxIntegration.email ?? 'Saved account'}
+                    {stockxIntegration.oauthConnected ? ' · OAuth connected' : ' · Login required'}
+                  </span>
+                  {revealedKeys.stockx && (
+                    <code className="revealed-credentials">{revealedKeys.stockx}</code>
+                  )}
+                </div>
+                <div className="key-actions">
+                  <button
+                    className="icon-button"
+                    type="button"
+                    data-focusable
+                    disabled={isBusy}
+                    aria-label={revealedKeys.stockx ? 'Hide StockX credentials' : 'Show StockX credentials'}
+                    onClick={() => void handleToggleStockXCredentials()}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                  <button
+                    className="icon-button trash-button"
+                    type="button"
+                    data-focusable
+                    disabled={isBusy}
+                    aria-label="Remove StockX integration"
+                    onClick={() => void handleDeleteStockXIntegration()}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M4 7h16" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                      <path d="M6 7l1 14h10l1-14" />
+                      <path d="M9 7V4h6v3" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="integration-status">Not connected</p>
             )}
-            <form className="stack-form" onSubmit={handleSaveStockXIntegration}>
-              <input
-                data-focusable
-                type="email"
-                placeholder="StockX account email"
-                value={stockxEmail}
-                onChange={(event) => setStockxEmail(event.target.value)}
-              />
-              <input
-                data-focusable
-                type="password"
-                placeholder="StockX x-api-key"
-                value={stockxApiKey}
-                onChange={(event) => setStockxApiKey(event.target.value)}
-              />
-              <input
-                data-focusable
-                type="text"
-                placeholder="Client ID"
-                value={stockxClientId}
-                onChange={(event) => setStockxClientId(event.target.value)}
-              />
-              <input
-                data-focusable
-                type="password"
-                placeholder="Client secret"
-                value={stockxClientSecret}
-                onChange={(event) => setStockxClientSecret(event.target.value)}
-              />
-              <button
-                className="primary-button"
-                type="submit"
-                data-focusable
-                disabled={
-                  isBusy
-                  || !stockxEmail.trim()
-                  || !stockxApiKey.trim()
-                  || !stockxClientId.trim()
-                  || !stockxClientSecret.trim()
-                }
-              >
-                Save StockX
-              </button>
-            </form>
-            {stockxIntegration?.configured && (
+
+            {!isDisplayApp && (
               <>
-                <button
-                  className="primary-button ready-button"
-                  type="button"
-                  data-focusable
-                  disabled={isBusy}
-                  onClick={() => void handleStockXLogin()}
-                >
-                  Login to StockX
-                </button>
-                <p className="integration-note">
-                  Register callback URL in StockX Developer Portal:
-                  {' '}
-                  {stockxIntegration.redirectUri ?? `${getApiBaseUrl()}/integrations/stockx/oauth/callback`}
-                </p>
-                <button
-                  className="text-button danger"
-                  type="button"
-                  data-focusable
-                  disabled={isBusy}
-                  onClick={() => void handleDeleteStockXIntegration()}
-                >
-                  Remove StockX
-                </button>
+                <form className="stack-form" onSubmit={handleSaveStockXIntegration}>
+                  <input
+                    data-focusable
+                    type="email"
+                    placeholder="StockX account email"
+                    value={stockxEmail}
+                    onChange={(event) => setStockxEmail(event.target.value)}
+                  />
+                  <input
+                    data-focusable
+                    type="password"
+                    placeholder="StockX x-api-key"
+                    value={stockxApiKey}
+                    onChange={(event) => setStockxApiKey(event.target.value)}
+                  />
+                  <input
+                    data-focusable
+                    type="text"
+                    placeholder="Client ID"
+                    value={stockxClientId}
+                    onChange={(event) => setStockxClientId(event.target.value)}
+                  />
+                  <input
+                    data-focusable
+                    type="password"
+                    placeholder="Client secret"
+                    value={stockxClientSecret}
+                    onChange={(event) => setStockxClientSecret(event.target.value)}
+                  />
+                  <button
+                    className="primary-button"
+                    type="submit"
+                    data-focusable
+                    disabled={
+                      isBusy
+                      || !stockxEmail.trim()
+                      || !stockxApiKey.trim()
+                      || !stockxClientId.trim()
+                      || !stockxClientSecret.trim()
+                    }
+                  >
+                    Save StockX
+                  </button>
+                </form>
+                {stockxIntegration?.configured && (
+                  <>
+                    <button
+                      className="primary-button ready-button"
+                      type="button"
+                      data-focusable
+                      disabled={isBusy}
+                      onClick={() => void handleStockXLogin()}
+                    >
+                      Login to StockX
+                    </button>
+                    <p className="integration-note">
+                      Register callback URL in StockX Developer Portal:
+                      {' '}
+                      {stockxIntegration.redirectUri ?? `${getApiBaseUrl()}/integrations/stockx/oauth/callback`}
+                    </p>
+                  </>
+                )}
               </>
             )}
           </div>

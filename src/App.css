@@ -830,6 +830,11 @@ select:focus {
   align-self: center;
 }
 
+.glass-card.settings-card[data-scrollable] {
+  max-height: calc(100svh - 96px);
+  overflow-y: auto;
+}
+
 .eyebrow {
   color: var(--accent);
   font-size: 13px;
@@ -976,6 +981,30 @@ select {
   color: rgba(255, 255, 255, 0.72);
   font-family: var(--mono);
   font-size: 12px;
+}
+
+.key-info code.revealed-credentials {
+  max-width: none;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+}
+
+.integration-email-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(20, 28, 44, 0.58);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: none;
 }
 
 .key-actions {
